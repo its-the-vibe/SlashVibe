@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/redis/go-redis/v9"
@@ -46,7 +47,7 @@ func loadConfig() (*Config, error) {
 	// Try to load Slack token from .secret file if not set via env var
 	if config.SlackToken == "" {
 		if token, err := os.ReadFile(".secret"); err == nil {
-			config.SlackToken = string(token)
+			config.SlackToken = strings.TrimSpace(string(token))
 		}
 	}
 
@@ -166,9 +167,13 @@ func handleNewRepoCommand(ctx context.Context, slackClient *slack.Client, cmd *S
 func createNewRepoModal(repoName string) slack.ModalViewRequest {
 	// Create the repository name input block
 	repoNameInput := slack.NewPlainTextInputBlockElement(
-		slack.NewTextBlockObject(slack.PlainTextType, "<repo_name>", false, false),
+		slack.NewTextBlockObject(slack.PlainTextType, "my-awesome-repo", false, false),
 		"repo_name_input",
 	)
+	// Pre-populate the repository name if provided in the command text
+	if repoName != "" {
+		repoNameInput = repoNameInput.WithInitialValue(repoName)
+	}
 
 	repoNameBlock := slack.NewInputBlock(
 		"repo-name",
