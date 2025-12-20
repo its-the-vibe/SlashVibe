@@ -159,7 +159,7 @@ When a view submission is processed, the service publishes a command to the Popp
   "type": "slash-vibe-new-repo",
   "dir": "/tmp",
   "commands": [
-    "gh repo create your-org/ExampleRepo --public --add-readme --gitignore Go --description \"Description for the example repository\""
+    "gh repo create your-org/ExampleRepo --public --add-readme --gitignore Go --description 'Description for the example repository'"
   ]
 }
 ```
