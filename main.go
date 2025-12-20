@@ -336,20 +336,20 @@ func handleViewSubmission(ctx context.Context, redisClient *redis.Client, config
 		Commands: []string{cmd},
 	}
 
-	// Publish to Poppit channel
+	// Push to Poppit list
 	poppitPayload, err := json.Marshal(poppitCmd)
 	if err != nil {
 		log.Printf("Failed to marshal Poppit command: %v", err)
 		return
 	}
 
-	err = redisClient.Publish(ctx, config.RedisPoppitChannel, string(poppitPayload)).Err()
+	err = redisClient.RPush(ctx, config.RedisPoppitChannel, string(poppitPayload)).Err()
 	if err != nil {
-		log.Printf("Failed to publish to Poppit channel: %v", err)
+		log.Printf("Failed to push to Poppit list: %v", err)
 		return
 	}
 
-	log.Printf("Successfully published Poppit command to channel %s: %s", config.RedisPoppitChannel, string(poppitPayload))
+	log.Printf("Successfully pushed Poppit command to list %s: %s", config.RedisPoppitChannel, string(poppitPayload))
 }
 
 // extractViewValues extracts values from the view submission state
