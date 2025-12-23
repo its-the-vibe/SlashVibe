@@ -8,6 +8,7 @@ services:
       - "host.docker.internal:host-gateway"
     environment:
       - REDIS_ADDR=${REDIS_ADDR:-host.docker.internal:6379}
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
       - REDIS_CHANNEL=${REDIS_CHANNEL:-slack-commands}
       - REDIS_VIEW_SUBMISSION_CHANNEL=${REDIS_VIEW_SUBMISSION_CHANNEL:-slack-relay-view-submission}
       - REDIS_POPPIT_LIST=${REDIS_POPPIT_LIST:-poppit:notifications}

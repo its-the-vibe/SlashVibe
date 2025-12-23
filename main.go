@@ -55,6 +55,7 @@ type PoppitCommand struct {
 // Config holds the application configuration
 type Config struct {
 	RedisAddr                  string
+	RedisPassword              string
 	RedisChannel               string
 	RedisViewSubmissionChannel string
 	RedisPoppitList            string
@@ -66,6 +67,7 @@ type Config struct {
 func loadConfig() (*Config, error) {
 	config := &Config{
 		RedisAddr:                  getEnv("REDIS_ADDR", "localhost:6379"),
+		RedisPassword:              getEnv("REDIS_PASSWORD", ""),
 		RedisChannel:               getEnv("REDIS_CHANNEL", "slack-commands"),
 		RedisViewSubmissionChannel: getEnv("REDIS_VIEW_SUBMISSION_CHANNEL", "slack-relay-view-submission"),
 		RedisPoppitList:            getEnv("REDIS_POPPIT_LIST", "poppit:notifications"),
@@ -112,7 +114,8 @@ func main() {
 
 	// Initialize Redis client
 	redisClient := redis.NewClient(&redis.Options{
-		Addr: config.RedisAddr,
+		Addr:     config.RedisAddr,
+		Password: config.RedisPassword, // empty means no password
 	})
 	defer redisClient.Close()
 

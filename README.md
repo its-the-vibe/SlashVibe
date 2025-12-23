@@ -23,6 +23,7 @@ The service can be configured via environment variables or a `.secret` file:
 ### Environment Variables
 
 - `REDIS_ADDR` - Redis server address (default: `localhost:6379`)
+- `REDIS_PASSWORD` - Redis server password (optional, set if your Redis requires authentication)
 - `REDIS_CHANNEL` - Redis channel to subscribe to for slash commands (default: `slack-commands`)
 - `REDIS_VIEW_SUBMISSION_CHANNEL` - Redis channel to subscribe to for view submissions (default: `slack-relay-view-submission`)
 - `REDIS_POPPIT_LIST` - Redis list to push Poppit commands to (default: `poppit-commands`)
