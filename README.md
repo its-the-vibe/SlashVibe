@@ -18,7 +18,7 @@ A simple Go service that subscribes to Slack slash commands and view submissions
 
 ## Configuration
 
-The service can be configured via environment variables or a `.secret` file:
+The service can be configured via environment variables:
 
 ### Environment Variables
 
@@ -30,15 +30,6 @@ The service can be configured via environment variables or a `.secret` file:
 - `SLACK_BOT_TOKEN` - Slack bot token (required)
 - `GITHUB_ORG` - GitHub organization name for creating repositories (required)
 - `WORKING_DIR` - Working directory for Poppit commands (default: `/tmp`)
-
-### .secret File
-
-Alternatively, you can create a `.secret` file in the root directory containing your Slack bot token:
-
-```bash
-cp .secret.example .secret
-# Edit .secret and add your Slack bot token
-```
 
 ## Running Locally
 
@@ -59,16 +50,9 @@ export GITHUB_ORG=your-github-org
 ./slashvibe
 ```
 
-Or use the `.secret` file:
-```bash
-echo "xoxb-your-token-here" > .secret
-export GITHUB_ORG=your-github-org
-./slashvibe
-```
-
 ## Running with Docker Compose
 
-1. Create a `.secret` file with your Slack bot token or set the `SLACK_BOT_TOKEN` environment variable
+1. Set the `SLACK_BOT_TOKEN` environment variable
 
 2. Start the services:
 ```bash

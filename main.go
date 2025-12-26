@@ -76,15 +76,8 @@ func loadConfig() (*Config, error) {
 		WorkingDir:                 getEnv("WORKING_DIR", "/tmp"),
 	}
 
-	// Try to load Slack token from .secret file if not set via env var
 	if config.SlackToken == "" {
-		if token, err := os.ReadFile(".secret"); err == nil {
-			config.SlackToken = strings.TrimSpace(string(token))
-		}
-	}
-
-	if config.SlackToken == "" {
-		return nil, fmt.Errorf("SLACK_BOT_TOKEN must be set via environment variable or .secret file")
+		return nil, fmt.Errorf("SLACK_BOT_TOKEN must be set via environment variable")
 	}
 
 	if config.GithubOrg == "" {

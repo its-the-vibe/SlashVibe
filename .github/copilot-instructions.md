@@ -22,7 +22,6 @@ SlashVibe is a Go service that bridges Slack slash commands with GitHub reposito
 ├── go.sum              # Go dependency checksums
 ├── Dockerfile          # Multi-stage Docker build
 ├── docker-compose.yml  # Docker Compose configuration
-├── .secret.example     # Example secret file template
 └── README.md           # Comprehensive documentation
 ```
 
@@ -84,7 +83,7 @@ The application is configured via environment variables:
 - `REDIS_CHANNEL` - Redis channel for slash commands (default: `slack-commands`)
 - `REDIS_VIEW_SUBMISSION_CHANNEL` - Redis channel for view submissions (default: `slack-relay-view-submission`)
 - `REDIS_POPPIT_LIST` - Redis list for Poppit commands (default: `poppit:notifications`)
-- `SLACK_BOT_TOKEN` - Slack bot token (required, can be in `.secret` file)
+- `SLACK_BOT_TOKEN` - Slack bot token (required)
 - `GITHUB_ORG` - GitHub organization name (required)
 - `WORKING_DIR` - Working directory for Poppit commands (default: `/tmp`)
 
@@ -161,10 +160,9 @@ Repository names must be validated:
 
 ## Security Considerations
 
-1. **Secrets Management**: Never commit `.secret` file - it's in `.gitignore`
-2. **Input Validation**: Always validate repository names before processing
-3. **Command Injection**: Escape single quotes in descriptions when building shell commands
-4. **Read-Only Container**: Docker container runs with `read_only: true`
+1. **Input Validation**: Always validate repository names before processing
+2. **Command Injection**: Escape single quotes in descriptions when building shell commands
+3. **Read-Only Container**: Docker container runs with `read_only: true`
 
 ## Common Tasks
 

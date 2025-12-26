@@ -15,6 +15,4 @@ services:
       - SLACK_BOT_TOKEN=${SLACK_BOT_TOKEN}
       - GITHUB_ORG=${GITHUB_ORG}
       - WORKING_DIR=${WORKING_DIR:-/tmp}
-    volumes:
-      - ./.secret:/app/.secret:ro
     restart: unless-stopped
