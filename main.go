@@ -286,7 +286,7 @@ func handleMessage(ctx context.Context, logger *Logger, slackClient *slack.Clien
 	case "/new-repo":
 		handleNewRepoCommand(ctx, logger, slackClient, &cmd)
 	default:
-		logger.Warn("Unknown command: %s", cmd.Command)
+		logger.Debug("Unknown command: %s", cmd.Command)
 	}
 }
 
