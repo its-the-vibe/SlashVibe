@@ -495,12 +495,15 @@ func handleViewSubmission(ctx context.Context, logger *Logger, redisClient *redi
 }
 
 // createVibeOpsConfiguration creates VibeOps configuration files and a draft PR
+// Note: These commands are executed by Poppit, which handles error handling.
+// The commands are run sequentially in the VibeOps working directory.
 func createVibeOpsConfiguration(ctx context.Context, logger *Logger, redisClient *redis.Client, config *Config, repoFullName, repoName string) {
 	branchName := fmt.Sprintf("bootstrap-%s", repoName)
 	prTitle := fmt.Sprintf("Add initial VibeOps configuration for %s", repoName)
 	prBody := "This PR adds the initial VibeOps configuration files for the project."
 
 	// Build the commands to run in the VibeOps working directory
+	// Note: The 'source' directory is the standard output directory for vibeops new-project
 	vibeOpsCommands := []string{
 		"git checkout main",
 		"git pull",
