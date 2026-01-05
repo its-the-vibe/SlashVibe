@@ -111,8 +111,11 @@ type ViewSubmissionPayload struct {
 		CallbackID string `json:"callback_id"`
 		State      struct {
 			Values map[string]map[string]struct {
-				Type  string `json:"type"`
-				Value string `json:"value"`
+				Type            string `json:"type"`
+				Value           string `json:"value"`
+				SelectedOptions []struct {
+					Value string `json:"value"`
+				} `json:"selected_options"`
 			} `json:"values"`
 		} `json:"state"`
 	} `json:"view"`
@@ -146,6 +149,7 @@ type Config struct {
 	SlackChannelNewRepo        string
 	GithubOrg                  string
 	WorkingDir                 string
+	VibeOpsWorkingDir          string
 	LogLevel                   string
 }
 
@@ -161,6 +165,7 @@ func loadConfig() (*Config, error) {
 		SlackChannelNewRepo:        getEnv("SLACK_CHANNEL_NEW_REPO", "#new-repo"),
 		GithubOrg:                  getEnv("GITHUB_ORG", ""),
 		WorkingDir:                 getEnv("WORKING_DIR", "/tmp"),
+		VibeOpsWorkingDir:          getEnv("VIBEOPS_WORKING_DIR", ""),
 		LogLevel:                   getEnv("LOG_LEVEL", "info"),
 	}
 
@@ -350,6 +355,24 @@ func createNewRepoModal(repoName string) slack.ModalViewRequest {
 	)
 	aiPromptBlock.Optional = true
 
+	// Create the VibeOps config checkbox
+	vibeOpsCheckbox := slack.NewCheckboxGroupsBlockElement(
+		"vibeops_config_checkbox",
+		slack.NewOptionBlockObject(
+			"create_vibeops_config",
+			slack.NewTextBlockObject(slack.PlainTextType, "Create sample VibeOps configuration files", false, false),
+			slack.NewTextBlockObject(slack.PlainTextType, "Generate initial VibeOps configuration and create a draft PR", false, false),
+		),
+	)
+
+	vibeOpsCheckboxBlock := slack.NewInputBlock(
+		"vibeops-config",
+		slack.NewTextBlockObject(slack.PlainTextType, "VibeOps Configuration", false, false),
+		nil,
+		vibeOpsCheckbox,
+	)
+	vibeOpsCheckboxBlock.Optional = true
+
 	// Create the modal view
 	modalView := slack.ModalViewRequest{
 		Type:       slack.VTModal,
@@ -371,6 +394,7 @@ func createNewRepoModal(repoName string) slack.ModalViewRequest {
 				repoNameBlock,
 				repoDescBlock,
 				aiPromptBlock,
+				vibeOpsCheckboxBlock,
 			},
 		},
 	}
@@ -457,8 +481,65 @@ func handleViewSubmission(ctx context.Context, logger *Logger, redisClient *redi
 	logger.Info("Successfully pushed Poppit command for repo: %s", repoFullName)
 	logger.Debug("Poppit command payload: %s", string(poppitPayload))
 
+	// Check if VibeOps configuration should be created
+	createVibeOpsConfig := values["vibeops-config"] == "true"
+	if createVibeOpsConfig && config.VibeOpsWorkingDir != "" {
+		logger.Info("Creating VibeOps configuration for repo: %s", repoName)
+		createVibeOpsConfiguration(ctx, logger, redisClient, config, repoFullName, repoName)
+	} else if createVibeOpsConfig && config.VibeOpsWorkingDir == "" {
+		logger.Warn("VibeOps configuration requested but VIBEOPS_WORKING_DIR is not set")
+	}
+
 	// Send confirmation message to SlackLiner
 	sendNewRepoConfirmation(ctx, logger, redisClient, config, repoFullName, repoDesc)
+}
+
+// createVibeOpsConfiguration creates VibeOps configuration files and a draft PR
+// Note: These commands are executed by Poppit, which handles error handling.
+// The commands are run sequentially in the VibeOps working directory.
+func createVibeOpsConfiguration(ctx context.Context, logger *Logger, redisClient *redis.Client, config *Config, repoFullName, repoName string) {
+	branchName := fmt.Sprintf("bootstrap-%s", repoName)
+	prTitle := fmt.Sprintf("Add initial VibeOps configuration for %s", repoName)
+	prBody := "This PR adds the initial VibeOps configuration files for the project."
+
+	// Build the commands to run in the VibeOps working directory
+	// Note: The 'source' directory is the standard output directory for vibeops new-project
+	vibeOpsCommands := []string{
+		"git checkout main",
+		"git pull",
+		"make build",
+		fmt.Sprintf("git checkout -b %s", branchName),
+		fmt.Sprintf("./vibeops new-project %s", repoName),
+		"git add source",
+		fmt.Sprintf("git commit -m \"Add initial configuration for %s\"", repoName),
+		fmt.Sprintf("git push -u origin %s", branchName),
+		fmt.Sprintf("gh pr create --title \"%s\" --body \"%s\" --draft", prTitle, prBody),
+	}
+
+	// Create Poppit command for VibeOps configuration
+	vibeOpsPoppitCmd := PoppitCommand{
+		Repo:     repoFullName,
+		Branch:   fmt.Sprintf("refs/heads/%s", branchName),
+		Type:     "slash-vibe-vibeops-config",
+		Dir:      config.VibeOpsWorkingDir,
+		Commands: vibeOpsCommands,
+	}
+
+	// Push to Poppit list
+	vibeOpsPayload, err := json.Marshal(vibeOpsPoppitCmd)
+	if err != nil {
+		logger.Error("Failed to marshal VibeOps Poppit command: %v", err)
+		return
+	}
+
+	err = redisClient.RPush(ctx, config.RedisPoppitList, string(vibeOpsPayload)).Err()
+	if err != nil {
+		logger.Error("Failed to push VibeOps command to Poppit list: %v", err)
+		return
+	}
+
+	logger.Info("Successfully pushed VibeOps configuration command for repo: %s", repoFullName)
+	logger.Debug("VibeOps Poppit command payload: %s", string(vibeOpsPayload))
 }
 
 // sendNewRepoConfirmation sends a confirmation message to SlackLiner
@@ -498,6 +579,7 @@ func sendNewRepoConfirmation(ctx context.Context, logger *Logger, redisClient *r
 
 // extractViewValues extracts values from the view submission state
 // Equivalent to: jq '.view.state.values | map_values(.[] | .value)'
+// For checkboxes, it checks if any options are selected
 func extractViewValues(submission ViewSubmissionPayload) map[string]string {
 	result := make(map[string]string)
 
@@ -506,7 +588,17 @@ func extractViewValues(submission ViewSubmissionPayload) map[string]string {
 		// In practice, each block contains exactly one action_id
 		// We extract the first (and only) value from each block
 		for _, valueObj := range blockValues {
-			result[blockID] = valueObj.Value
+			// Handle checkboxes (checkboxes type)
+			if valueObj.Type == "checkboxes" {
+				if len(valueObj.SelectedOptions) > 0 {
+					result[blockID] = "true"
+				} else {
+					result[blockID] = "false"
+				}
+			} else {
+				// Handle text inputs and other types
+				result[blockID] = valueObj.Value
+			}
 			break
 		}
 	}

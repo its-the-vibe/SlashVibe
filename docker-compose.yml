@@ -13,4 +13,5 @@ services:
       - SLACK_BOT_TOKEN=${SLACK_BOT_TOKEN}
       - GITHUB_ORG=${GITHUB_ORG}
       - WORKING_DIR=${WORKING_DIR:-/tmp}
+      - VIBEOPS_WORKING_DIR=${VIBEOPS_WORKING_DIR}
     restart: unless-stopped

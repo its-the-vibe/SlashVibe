@@ -32,6 +32,7 @@ The service can be configured via environment variables:
 - `SLACK_CHANNEL_NEW_REPO` - Slack channel for new repository confirmations (default: `#new-repo`)
 - `GITHUB_ORG` - GitHub organization name for creating repositories (required)
 - `WORKING_DIR` - Working directory for Poppit commands (default: `/tmp`)
+- `VIBEOPS_WORKING_DIR` - Working directory for VibeOps configuration generation (optional, if not set VibeOps config generation is skipped)
 - `LOG_LEVEL` - Logging level: `debug`, `info`, `warn`, or `error` (default: `info`)
 
 ### Log Levels
@@ -112,13 +113,21 @@ Opens a modal dialog for creating a new repository with the following fields:
 - **Repository Name** (required) - Letters, numbers, hyphens only
 - **Repository Description** (optional) - A short description
 - **Copilot Issue Prompt** (optional) - Describe what Copilot should generate
+- **VibeOps Configuration** (optional) - Checkbox to create sample VibeOps configuration files
 
 When the user submits the modal, the service will:
 1. Receive the view submission payload on the `REDIS_VIEW_SUBMISSION_CHANNEL`
 2. Extract the repository name and description from the submission
 3. Generate a GitHub CLI command to create the repository
 4. Push a Poppit command to the `REDIS_POPPIT_CHANNEL`
-5. Send a confirmation message to the `#new-repo` Slack channel via SlackLiner with:
+5. If the "Create sample VibeOps configuration files" checkbox is selected and `VIBEOPS_WORKING_DIR` is set:
+   - Push an additional Poppit command to create VibeOps configuration files
+   - The VibeOps commands will run in the `VIBEOPS_WORKING_DIR` directory
+   - Create a new branch `bootstrap-<repo-name>`
+   - Run `vibeops new-project` to generate configuration files
+   - Commit and push the changes
+   - Create a draft PR with the configuration files
+6. Send a confirmation message to the `#new-repo` Slack channel via SlackLiner with:
    - Repository name and link
    - Repository description (if provided)
    - 7-day TTL for automatic message cleanup
