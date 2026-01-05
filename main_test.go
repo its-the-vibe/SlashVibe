@@ -130,3 +130,226 @@ func TestIsValidRepoName(t *testing.T) {
 		})
 	}
 }
+
+// TestExtractViewValues tests the extraction of values from view submissions
+func TestExtractViewValues(t *testing.T) {
+	tests := []struct {
+		name     string
+		payload  ViewSubmissionPayload
+		expected map[string]string
+	}{
+		{
+			name: "TextInputOnly",
+			payload: ViewSubmissionPayload{
+				View: struct {
+					CallbackID string `json:"callback_id"`
+					State      struct {
+						Values map[string]map[string]struct {
+							Type            string `json:"type"`
+							Value           string `json:"value"`
+							SelectedOptions []struct {
+								Value string `json:"value"`
+							} `json:"selected_options"`
+						} `json:"values"`
+					} `json:"state"`
+				}{
+					State: struct {
+						Values map[string]map[string]struct {
+							Type            string `json:"type"`
+							Value           string `json:"value"`
+							SelectedOptions []struct {
+								Value string `json:"value"`
+							} `json:"selected_options"`
+						} `json:"values"`
+					}{
+						Values: map[string]map[string]struct {
+							Type            string `json:"type"`
+							Value           string `json:"value"`
+							SelectedOptions []struct {
+								Value string `json:"value"`
+							} `json:"selected_options"`
+						}{
+							"repo-name": {
+								"repo_name_input": {
+									Type:  "plain_text_input",
+									Value: "test-repo",
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: map[string]string{
+				"repo-name": "test-repo",
+			},
+		},
+		{
+			name: "CheckboxSelected",
+			payload: ViewSubmissionPayload{
+				View: struct {
+					CallbackID string `json:"callback_id"`
+					State      struct {
+						Values map[string]map[string]struct {
+							Type            string `json:"type"`
+							Value           string `json:"value"`
+							SelectedOptions []struct {
+								Value string `json:"value"`
+							} `json:"selected_options"`
+						} `json:"values"`
+					} `json:"state"`
+				}{
+					State: struct {
+						Values map[string]map[string]struct {
+							Type            string `json:"type"`
+							Value           string `json:"value"`
+							SelectedOptions []struct {
+								Value string `json:"value"`
+							} `json:"selected_options"`
+						} `json:"values"`
+					}{
+						Values: map[string]map[string]struct {
+							Type            string `json:"type"`
+							Value           string `json:"value"`
+							SelectedOptions []struct {
+								Value string `json:"value"`
+							} `json:"selected_options"`
+						}{
+							"vibeops-config": {
+								"vibeops_config_checkbox": {
+									Type: "checkboxes",
+									SelectedOptions: []struct {
+										Value string `json:"value"`
+									}{
+										{Value: "create_vibeops_config"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: map[string]string{
+				"vibeops-config": "true",
+			},
+		},
+		{
+			name: "CheckboxNotSelected",
+			payload: ViewSubmissionPayload{
+				View: struct {
+					CallbackID string `json:"callback_id"`
+					State      struct {
+						Values map[string]map[string]struct {
+							Type            string `json:"type"`
+							Value           string `json:"value"`
+							SelectedOptions []struct {
+								Value string `json:"value"`
+							} `json:"selected_options"`
+						} `json:"values"`
+					} `json:"state"`
+				}{
+					State: struct {
+						Values map[string]map[string]struct {
+							Type            string `json:"type"`
+							Value           string `json:"value"`
+							SelectedOptions []struct {
+								Value string `json:"value"`
+							} `json:"selected_options"`
+						} `json:"values"`
+					}{
+						Values: map[string]map[string]struct {
+							Type            string `json:"type"`
+							Value           string `json:"value"`
+							SelectedOptions []struct {
+								Value string `json:"value"`
+							} `json:"selected_options"`
+						}{
+							"vibeops-config": {
+								"vibeops_config_checkbox": {
+									Type: "checkboxes",
+									SelectedOptions: []struct {
+										Value string `json:"value"`
+									}{},
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: map[string]string{
+				"vibeops-config": "false",
+			},
+		},
+		{
+			name: "MixedTextAndCheckbox",
+			payload: ViewSubmissionPayload{
+				View: struct {
+					CallbackID string `json:"callback_id"`
+					State      struct {
+						Values map[string]map[string]struct {
+							Type            string `json:"type"`
+							Value           string `json:"value"`
+							SelectedOptions []struct {
+								Value string `json:"value"`
+							} `json:"selected_options"`
+						} `json:"values"`
+					} `json:"state"`
+				}{
+					State: struct {
+						Values map[string]map[string]struct {
+							Type            string `json:"type"`
+							Value           string `json:"value"`
+							SelectedOptions []struct {
+								Value string `json:"value"`
+							} `json:"selected_options"`
+						} `json:"values"`
+					}{
+						Values: map[string]map[string]struct {
+							Type            string `json:"type"`
+							Value           string `json:"value"`
+							SelectedOptions []struct {
+								Value string `json:"value"`
+							} `json:"selected_options"`
+						}{
+							"repo-name": {
+								"repo_name_input": {
+									Type:  "plain_text_input",
+									Value: "my-repo",
+								},
+							},
+							"vibeops-config": {
+								"vibeops_config_checkbox": {
+									Type: "checkboxes",
+									SelectedOptions: []struct {
+										Value string `json:"value"`
+									}{
+										{Value: "create_vibeops_config"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: map[string]string{
+				"repo-name":      "my-repo",
+				"vibeops-config": "true",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := extractViewValues(tt.payload)
+			if len(result) != len(tt.expected) {
+				t.Errorf("extractViewValues() returned %d values, expected %d", len(result), len(tt.expected))
+			}
+			for key, expectedValue := range tt.expected {
+				if gotValue, ok := result[key]; !ok {
+					t.Errorf("extractViewValues() missing key %q", key)
+				} else if gotValue != expectedValue {
+					t.Errorf("extractViewValues()[%q] = %q, want %q", key, gotValue, expectedValue)
+				}
+			}
+		})
+	}
+}
