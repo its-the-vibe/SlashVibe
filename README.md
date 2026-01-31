@@ -33,6 +33,7 @@ The service can be configured via environment variables:
 - `GITHUB_ORG` - GitHub organization name for creating repositories (required)
 - `WORKING_DIR` - Working directory for Poppit commands (default: `/tmp`)
 - `VIBEOPS_WORKING_DIR` - Working directory for VibeOps configuration generation (optional, if not set VibeOps config generation is skipped)
+- `GITHUB_PRIVATE_WORKING_DIR` - Working directory for .github_private repository (optional, required for creating PRs with projects.json changes)
 - `LOG_LEVEL` - Logging level: `debug`, `info`, `warn`, or `error` (default: `info`)
 
 ### Log Levels
@@ -127,6 +128,12 @@ When the user submits the modal, the service will:
    - Run `vibeops new-project` to generate configuration files
    - Commit and push the changes
    - Create a draft PR with the configuration files
+   - If `GITHUB_PRIVATE_WORKING_DIR` is also set:
+     - After running `vibeops new-project`, which updates the `projects.json` file (a symlink to `.github_private` repository)
+     - Create a new branch in `.github_private` repository: `add-project-<repo-name>`
+     - Add and commit the updated `projects.json`
+     - Push the branch to `.github_private` repository
+     - Create a draft PR in `.github_private` with the `projects.json` changes
 6. Send a confirmation message to the `#new-repo` Slack channel via SlackLiner with:
    - Repository name and link
    - Repository description (if provided)
