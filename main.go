@@ -547,7 +547,7 @@ func createVibeOpsConfiguration(ctx context.Context, logger *Logger, redisClient
 	if config.GithubPrivateWorkingDir != "" {
 		createGithubPrivatePR(ctx, logger, redisClient, config, repoFullName, repoName)
 	} else {
-		logger.Warn(".github_private PR creation requested but GITHUB_PRIVATE_WORKING_DIR is not set")
+		logger.Debug("GITHUB_PRIVATE_WORKING_DIR not set, skipping .github_private PR creation")
 	}
 }
 
@@ -563,12 +563,14 @@ func createGithubPrivatePR(ctx context.Context, logger *Logger, redisClient *red
 	// Build the commands to run in the .github_private working directory
 	// The ./vibeops new-project command updates projects.json (which is a symlink to .github_private)
 	// So we need to commit those changes in the .github_private repo
+	// Note: Using git diff-index to check if there are changes before committing
 	githubPrivateCommands := []string{
 		"git checkout main",
 		"git pull",
 		fmt.Sprintf("git checkout -b %s", branchName),
 		"git add projects.json",
-		fmt.Sprintf("git commit -m \"%s\"", commitMessage),
+		// Only commit if there are changes to avoid failures
+		fmt.Sprintf("git diff-index --quiet HEAD || git commit -m \"%s\"", commitMessage),
 		fmt.Sprintf("git push -u origin %s", branchName),
 		fmt.Sprintf("gh pr create --title \"%s\" --body \"%s\" --draft", prTitle, prBody),
 	}
