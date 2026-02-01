@@ -353,3 +353,45 @@ func TestExtractViewValues(t *testing.T) {
 		})
 	}
 }
+
+// TestLoadConfigWithGithubPrivateWorkingDir tests that the GITHUB_PRIVATE_WORKING_DIR is correctly loaded
+func TestLoadConfigWithGithubPrivateWorkingDir(t *testing.T) {
+	// Set up test environment
+	os.Setenv("SLACK_BOT_TOKEN", "test-token")
+	os.Setenv("GITHUB_ORG", "test-org")
+	os.Setenv("GITHUB_PRIVATE_WORKING_DIR", "/test/github_private")
+	defer func() {
+		os.Unsetenv("SLACK_BOT_TOKEN")
+		os.Unsetenv("GITHUB_ORG")
+		os.Unsetenv("GITHUB_PRIVATE_WORKING_DIR")
+	}()
+
+	config, err := loadConfig()
+	if err != nil {
+		t.Fatalf("loadConfig() failed: %v", err)
+	}
+
+	if config.GithubPrivateWorkingDir != "/test/github_private" {
+		t.Errorf("GithubPrivateWorkingDir = %q, want %q", config.GithubPrivateWorkingDir, "/test/github_private")
+	}
+}
+
+// TestLoadConfigWithoutGithubPrivateWorkingDir tests that the config loads with empty GITHUB_PRIVATE_WORKING_DIR
+func TestLoadConfigWithoutGithubPrivateWorkingDir(t *testing.T) {
+	// Set up test environment
+	os.Setenv("SLACK_BOT_TOKEN", "test-token")
+	os.Setenv("GITHUB_ORG", "test-org")
+	defer func() {
+		os.Unsetenv("SLACK_BOT_TOKEN")
+		os.Unsetenv("GITHUB_ORG")
+	}()
+
+	config, err := loadConfig()
+	if err != nil {
+		t.Fatalf("loadConfig() failed: %v", err)
+	}
+
+	if config.GithubPrivateWorkingDir != "" {
+		t.Errorf("GithubPrivateWorkingDir = %q, want empty string", config.GithubPrivateWorkingDir)
+	}
+}

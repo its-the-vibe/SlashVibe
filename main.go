@@ -150,6 +150,7 @@ type Config struct {
 	GithubOrg                  string
 	WorkingDir                 string
 	VibeOpsWorkingDir          string
+	GithubPrivateWorkingDir    string
 	LogLevel                   string
 }
 
@@ -166,6 +167,7 @@ func loadConfig() (*Config, error) {
 		GithubOrg:                  getEnv("GITHUB_ORG", ""),
 		WorkingDir:                 getEnv("WORKING_DIR", "/tmp"),
 		VibeOpsWorkingDir:          getEnv("VIBEOPS_WORKING_DIR", ""),
+		GithubPrivateWorkingDir:    getEnv("GITHUB_PRIVATE_WORKING_DIR", ""),
 		LogLevel:                   getEnv("LOG_LEVEL", "info"),
 	}
 
@@ -540,6 +542,66 @@ func createVibeOpsConfiguration(ctx context.Context, logger *Logger, redisClient
 
 	logger.Info("Successfully pushed VibeOps configuration command for repo: %s", repoFullName)
 	logger.Debug("VibeOps Poppit command payload: %s", string(vibeOpsPayload))
+
+	// If GithubPrivateWorkingDir is configured, create a PR for projects.json in .github_private
+	if config.GithubPrivateWorkingDir != "" {
+		createGithubPrivatePR(ctx, logger, redisClient, config, repoFullName, repoName)
+	} else {
+		logger.Debug("GITHUB_PRIVATE_WORKING_DIR not set, skipping .github_private PR creation")
+	}
+}
+
+// createGithubPrivatePR creates a PR in .github_private repository for projects.json changes
+// Note: These commands are executed by Poppit, which handles error handling.
+// The commands are run sequentially in the .github_private working directory.
+func createGithubPrivatePR(ctx context.Context, logger *Logger, redisClient *redis.Client, config *Config, repoFullName, repoName string) {
+	branchName := fmt.Sprintf("add-project-%s", repoName)
+	prTitle := fmt.Sprintf("Add %s to projects.json", repoName)
+	prBody := fmt.Sprintf("Automatically generated PR to add %s project configuration to projects.json", repoName)
+	commitMessage := fmt.Sprintf("Add %s to projects.json", repoName)
+
+	// Build the commands to run in the .github_private working directory
+	// The ./vibeops new-project command updates projects.json (which is a symlink to .github_private)
+	// So we need to commit those changes in the .github_private repo
+	// Note: Using git diff-index to check if there are changes before committing
+	githubPrivateCommands := []string{
+		"git checkout main",
+		"git pull",
+		fmt.Sprintf("git checkout -b %s", branchName),
+		"git add projects.json",
+		// Only commit if there are changes to avoid failures
+		fmt.Sprintf("git diff-index --quiet HEAD || git commit -m \"%s\"", commitMessage),
+		fmt.Sprintf("git push -u origin %s", branchName),
+		fmt.Sprintf("gh pr create --title \"%s\" --body \"%s\" --draft", prTitle, prBody),
+	}
+
+	// Determine the .github_private repo name - assume it's in the same org
+	githubPrivateRepo := fmt.Sprintf("%s/.github_private", config.GithubOrg)
+
+	// Create Poppit command for .github_private PR
+	githubPrivatePoppitCmd := PoppitCommand{
+		Repo:     githubPrivateRepo,
+		Branch:   fmt.Sprintf("refs/heads/%s", branchName),
+		Type:     "slash-vibe-github-private-pr",
+		Dir:      config.GithubPrivateWorkingDir,
+		Commands: githubPrivateCommands,
+	}
+
+	// Push to Poppit list
+	githubPrivatePayload, err := json.Marshal(githubPrivatePoppitCmd)
+	if err != nil {
+		logger.Error("Failed to marshal .github_private Poppit command: %v", err)
+		return
+	}
+
+	err = redisClient.RPush(ctx, config.RedisPoppitList, string(githubPrivatePayload)).Err()
+	if err != nil {
+		logger.Error("Failed to push .github_private command to Poppit list: %v", err)
+		return
+	}
+
+	logger.Info("Successfully pushed .github_private PR command for repo: %s", repoFullName)
+	logger.Debug(".github_private Poppit command payload: %s", string(githubPrivatePayload))
 }
 
 // sendNewRepoConfirmation sends a confirmation message to SlackLiner
