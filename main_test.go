@@ -359,7 +359,7 @@ func TestLoadConfigWithGithubPrivateWorkingDir(t *testing.T) {
 	// Set up test environment
 	os.Setenv("SLACK_BOT_TOKEN", "test-token")
 	os.Setenv("GITHUB_ORG", "test-org")
-	os.Setenv("GITHUB_PRIVATE_WORKING_DIR", "/test/github_private")
+	os.Setenv("GITHUB_PRIVATE_WORKING_DIR", "/test/github-private")
 	defer func() {
 		os.Unsetenv("SLACK_BOT_TOKEN")
 		os.Unsetenv("GITHUB_ORG")
@@ -371,8 +371,8 @@ func TestLoadConfigWithGithubPrivateWorkingDir(t *testing.T) {
 		t.Fatalf("loadConfig() failed: %v", err)
 	}
 
-	if config.GithubPrivateWorkingDir != "/test/github_private" {
-		t.Errorf("GithubPrivateWorkingDir = %q, want %q", config.GithubPrivateWorkingDir, "/test/github_private")
+	if config.GithubPrivateWorkingDir != "/test/github-private" {
+		t.Errorf("GithubPrivateWorkingDir = %q, want %q", config.GithubPrivateWorkingDir, "/test/github-private")
 	}
 }
 
