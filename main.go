@@ -19,6 +19,10 @@ const (
 	SevenDaysTTL = 7 * 24 * 60 * 60
 	// NewRepoModalCallbackID is the callback ID for the new repo modal
 	NewRepoModalCallbackID = "create_github_repo_modal"
+
+	// New branch prefix constant for both VibeOps config and .github-private PRs
+	// to ensure consistent naming and easier identification of branches created by this service
+	NewProjectBranchPrefix = "new-project"
 )
 
 // LogLevel represents the logging level
@@ -500,7 +504,7 @@ func handleViewSubmission(ctx context.Context, logger *Logger, redisClient *redi
 // Note: These commands are executed by Poppit, which handles error handling.
 // The commands are run sequentially in the VibeOps working directory.
 func createVibeOpsConfiguration(ctx context.Context, logger *Logger, redisClient *redis.Client, config *Config, repoFullName, repoName string) {
-	branchName := fmt.Sprintf("bootstrap-%s", repoName)
+	branchName := fmt.Sprintf("%s/bootstrap-%s", NewProjectBranchPrefix, repoName)
 	prTitle := fmt.Sprintf("Add initial VibeOps configuration for %s", repoName)
 	prBody := "This PR adds the initial VibeOps configuration files for the project."
 
@@ -555,7 +559,7 @@ func createVibeOpsConfiguration(ctx context.Context, logger *Logger, redisClient
 // Note: These commands are executed by Poppit, which handles error handling.
 // The commands are run sequentially in the .github-private working directory.
 func createGithubPrivatePR(ctx context.Context, logger *Logger, redisClient *redis.Client, config *Config, repoFullName, repoName string) {
-	branchName := fmt.Sprintf("add-project-%s", repoName)
+	branchName := fmt.Sprintf("%s/add-project-%s", NewProjectBranchPrefix, repoName)
 	prTitle := fmt.Sprintf("Add %s to projects.json", repoName)
 	prBody := fmt.Sprintf("Automatically generated PR to add %s project configuration to projects.json", repoName)
 	commitMessage := fmt.Sprintf("Add %s to projects.json", repoName)
