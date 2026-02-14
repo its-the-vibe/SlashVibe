@@ -15,4 +15,4 @@ services:
       - WORKING_DIR=${WORKING_DIR:-/tmp}
       - VIBEOPS_WORKING_DIR=${VIBEOPS_WORKING_DIR}
       - GITHUB_PRIVATE_WORKING_DIR=${GITHUB_PRIVATE_WORKING_DIR}
-    restart: unless-stopped
+    restart: on-failure:10
