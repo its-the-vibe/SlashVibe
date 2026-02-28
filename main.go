@@ -291,7 +291,7 @@ func handleMessage(ctx context.Context, logger *Logger, slackClient *slack.Clien
 		return
 	}
 
-	logger.Info("Processing command: %s from user: %s", cmd.Command, cmd.UserName)
+	logger.Debug("Processing command: %s from user: %s", cmd.Command, cmd.UserName)
 
 	switch cmd.Command {
 	case "/new-repo":
