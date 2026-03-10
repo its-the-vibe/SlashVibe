@@ -2,7 +2,7 @@ module github.com/its-the-vibe/SlashVibeRepo
 
 go 1.26
 
-toolchain go1.26.0
+toolchain go1.26.1
 
 require (
 	github.com/redis/go-redis/v9 v9.18.0
