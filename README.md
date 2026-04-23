@@ -1,5 +1,7 @@
 # SlashVibeRepo
 
+![CI](https://github.com/its-the-vibe/SlashVibeRepo/actions/workflows/ci.yaml/badge.svg?branch=main)
+
 A simple Go service that subscribes to Slack slash commands and view submissions via Redis and performs operations.
 
 ## Features
@@ -53,6 +55,24 @@ export LOG_LEVEL=warn   # Show only warnings and errors
 export LOG_LEVEL=error  # Show only errors
 ```
 
+## Development
+
+Common development tasks are managed via the `Makefile`:
+
+| Target  | Description                              |
+|---------|------------------------------------------|
+| `build` | Compile a static binary (`slashviberepo`) |
+| `test`  | Run tests with race detection and coverage |
+| `lint`  | Run `go vet` to check for common issues  |
+| `clean` | Remove the binary and coverage artifacts |
+
+```bash
+make build   # build the binary
+make test    # run tests
+make lint    # lint the code
+make clean   # clean up artifacts
+```
+
 ## Running Locally
 
 1. Install dependencies:
@@ -62,7 +82,7 @@ go mod download
 
 2. Build the service:
 ```bash
-go build -o slashviberepo
+make build
 ```
 
 3. Run the service:
