@@ -335,6 +335,58 @@ func TestExtractViewValues(t *testing.T) {
 				"vibeops-config": "true",
 			},
 		},
+		{
+			name: "WithAIPrompt",
+			payload: ViewSubmissionPayload{
+				View: struct {
+					CallbackID string `json:"callback_id"`
+					State      struct {
+						Values map[string]map[string]struct {
+							Type            string `json:"type"`
+							Value           string `json:"value"`
+							SelectedOptions []struct {
+								Value string `json:"value"`
+							} `json:"selected_options"`
+						} `json:"values"`
+					} `json:"state"`
+				}{
+					State: struct {
+						Values map[string]map[string]struct {
+							Type            string `json:"type"`
+							Value           string `json:"value"`
+							SelectedOptions []struct {
+								Value string `json:"value"`
+							} `json:"selected_options"`
+						} `json:"values"`
+					}{
+						Values: map[string]map[string]struct {
+							Type            string `json:"type"`
+							Value           string `json:"value"`
+							SelectedOptions []struct {
+								Value string `json:"value"`
+							} `json:"selected_options"`
+						}{
+							"repo-name": {
+								"repo_name_input": {
+									Type:  "plain_text_input",
+									Value: "my-repo",
+								},
+							},
+							"ai-prompt": {
+								"ai_prompt_input": {
+									Type:  "plain_text_input",
+									Value: "Test AI Prompt",
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: map[string]string{
+				"repo-name": "my-repo",
+				"ai-prompt": "Test AI Prompt",
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -393,5 +445,47 @@ func TestLoadConfigWithoutGithubPrivateWorkingDir(t *testing.T) {
 
 	if config.GithubPrivateWorkingDir != "" {
 		t.Errorf("GithubPrivateWorkingDir = %q, want empty string", config.GithubPrivateWorkingDir)
+	}
+}
+
+// TestLoadConfigWithIssueCreationDelay tests that the ISSUE_CREATION_DELAY is correctly loaded
+func TestLoadConfigWithIssueCreationDelay(t *testing.T) {
+	tests := []struct {
+		name     string
+		envValue string
+		expected int
+	}{
+		{"ValidDelay", "10", 10},
+		{"DefaultDelay", "", 5},
+		{"InvalidDelay", "abc", 5},
+		{"ZeroDelay", "0", 0},
+		{"NegativeDelay", "-1", -1},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Set up test environment
+			os.Setenv("SLACK_BOT_TOKEN", "test-token")
+			os.Setenv("GITHUB_ORG", "test-org")
+			if tt.envValue != "" {
+				os.Setenv("ISSUE_CREATION_DELAY", tt.envValue)
+			} else {
+				os.Unsetenv("ISSUE_CREATION_DELAY")
+			}
+			defer func() {
+				os.Unsetenv("SLACK_BOT_TOKEN")
+				os.Unsetenv("GITHUB_ORG")
+				os.Unsetenv("ISSUE_CREATION_DELAY")
+			}()
+
+			config, err := loadConfig()
+			if err != nil {
+				t.Fatalf("loadConfig() failed: %v", err)
+			}
+
+			if config.IssueCreationDelay != tt.expected {
+				t.Errorf("IssueCreationDelay = %d, want %d", config.IssueCreationDelay, tt.expected)
+			}
+		})
 	}
 }
