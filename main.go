@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 
@@ -156,6 +157,7 @@ type Config struct {
 	VibeOpsWorkingDir          string
 	GithubPrivateWorkingDir    string
 	LogLevel                   string
+	IssueCreationDelay         int
 }
 
 func loadConfig() (*Config, error) {
@@ -174,6 +176,15 @@ func loadConfig() (*Config, error) {
 		GithubPrivateWorkingDir:    getEnv("GITHUB_PRIVATE_WORKING_DIR", ""),
 		LogLevel:                   getEnv("LOG_LEVEL", "info"),
 	}
+
+	// Parse issue creation delay
+	delayStr := getEnv("ISSUE_CREATION_DELAY", "5")
+	delay, err := strconv.Atoi(delayStr)
+	if err != nil {
+		log.Printf("[WARN] Invalid ISSUE_CREATION_DELAY '%s', using default of 5 seconds", delayStr)
+		delay = 5
+	}
+	config.IssueCreationDelay = delay
 
 	if config.SlackToken == "" {
 		return nil, fmt.Errorf("SLACK_BOT_TOKEN must be set via environment variable")
@@ -469,6 +480,22 @@ func handleViewSubmission(ctx context.Context, logger *Logger, redisClient *redi
 			ghRepoCloneCmd,
 			ghVibeInitCmd,
 		},
+	}
+
+	// Check if AI prompt is provided and create an initial issue
+	aiPrompt := values["ai-prompt"]
+	if aiPrompt != "" {
+		// Escape single quotes for shell safety
+		escapedPrompt := strings.ReplaceAll(aiPrompt, `'`, `'\''`)
+
+		// Add delay to ensure repo is ready
+		sleepCmd := fmt.Sprintf("sleep %d", config.IssueCreationDelay)
+
+		// Create the issue using gh issue create
+		// We use -R to specify the repository explicitly
+		ghIssueCreateCmd := fmt.Sprintf("gh issue create -R %s --title 'Initial Copilot Issue' --body '%s'", repoFullName, escapedPrompt)
+
+		poppitCmd.Commands = append(poppitCmd.Commands, sleepCmd, ghIssueCreateCmd)
 	}
 
 	// Push to Poppit list
