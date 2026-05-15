@@ -493,7 +493,7 @@ func handleViewSubmission(ctx context.Context, logger *Logger, redisClient *redi
 
 		// Create the issue using gh issue create
 		// We use -R to specify the repository explicitly
-		ghIssueCreateCmd := fmt.Sprintf("gh issue create -R %s --title 'Initial Copilot Issue' --body '%s'", repoFullName, escapedPrompt)
+		ghIssueCreateCmd := fmt.Sprintf("gh issue create -R %s --title 'Initial Issue' --body '%s'", repoFullName, escapedPrompt)
 
 		poppitCmd.Commands = append(poppitCmd.Commands, sleepCmd, ghIssueCreateCmd)
 	}
