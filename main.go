@@ -495,7 +495,11 @@ func handleViewSubmission(ctx context.Context, logger *Logger, redisClient *redi
 		// We use -R to specify the repository explicitly
 		ghIssueCreateCmd := fmt.Sprintf("gh issue create -R %s --title 'Initial Issue' --body '%s'", repoFullName, escapedPrompt)
 
-		poppitCmd.Commands = append(poppitCmd.Commands, sleepCmd, ghIssueCreateCmd)
+		issueUrl := fmt.Sprintf("https://github.com/%s/issues/1", repoFullName)
+
+		vibeNotifyCmd := fmt.Sprintf("%s/vibe-notify/bin/vibe-notify --config %s/vibe-notify/config.yaml issue %s", config.WorkingDir, config.WorkingDir, issueUrl)
+
+		poppitCmd.Commands = append(poppitCmd.Commands, sleepCmd, ghIssueCreateCmd, vibeNotifyCmd)
 	}
 
 	// Push to Poppit list
