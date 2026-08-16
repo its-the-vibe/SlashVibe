@@ -158,7 +158,13 @@ cp config.example.json config.json  # edit non-secret settings
 
 ## Running with Docker Compose
 
-1. Set the `SLACK_BOT_TOKEN` environment variable
+1. Create the local config file and set the `SLACK_BOT_TOKEN` environment variable:
+
+```bash
+cp config.example.json config.json
+```
+
+Edit `config.json` with the non-secret settings for the container. It is mounted read-only at `/config.json`.
 
 2. Start the services:
 ```bash
