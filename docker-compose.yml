@@ -4,9 +4,12 @@ services:
     image: ghcr.io/its-the-vibe/slashviberepo:latest
     pull_policy: always
     read_only: true
+    volumes:
+      - ./config.json:/config.json:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
+      - CONFIG_FILE=/config.json
       - REDIS_PASSWORD=${REDIS_PASSWORD}
       - SLACK_BOT_TOKEN=${SLACK_BOT_TOKEN}
     restart: on-failure:10
