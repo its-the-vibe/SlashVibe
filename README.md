@@ -20,23 +20,87 @@ A simple Go service that subscribes to Slack slash commands and view submissions
 
 ## Configuration
 
-The service can be configured via environment variables:
+The service uses a two-file configuration approach that separates secrets from non-secret settings.
 
-### Environment Variables
+### 1. Secrets (`.env` file)
 
-- `REDIS_ADDR` - Redis server address (default: `localhost:6379`)
-- `REDIS_PASSWORD` - Redis server password (optional, set if your Redis requires authentication)
-- `REDIS_CHANNEL` - Redis channel to subscribe to for slash commands (default: `slack-commands`)
-- `REDIS_VIEW_SUBMISSION_CHANNEL` - Redis channel to subscribe to for view submissions (default: `slack-relay-view-submission`)
-- `REDIS_POPPIT_LIST` - Redis list to push Poppit commands to (default: `poppit-commands`)
-- `REDIS_SLACKLINER_LIST` - Redis list to push SlackLiner messages to (default: `slack_messages`)
-- `SLACK_BOT_TOKEN` - Slack bot token (required)
-- `SLACK_CHANNEL_NEW_REPO` - Slack channel for new repository confirmations (default: `#new-repo`)
-- `GITHUB_ORG` - GitHub organization name for creating repositories (required)
-- `WORKING_DIR` - Working directory for Poppit commands (default: `/tmp`)
-- `VIBEOPS_WORKING_DIR` - Working directory for VibeOps configuration generation (optional, if not set VibeOps config generation is skipped)
-- `GITHUB_PRIVATE_WORKING_DIR` - Working directory for .github-private repository (optional, required for creating PRs with projects.json changes)
-- `LOG_LEVEL` - Logging level: `debug`, `info`, `warn`, or `error` (default: `info`)
+Create a `.env` file (git-ignored) from the provided example:
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` with your actual secrets:
+
+```env
+REDIS_PASSWORD=your-redis-password-if-any
+SLACK_BOT_TOKEN=xoxb-your-slack-bot-token-here
+```
+
+### 2. Non-secret configuration (`config.json`)
+
+Create a `config.json` file (git-ignored) from the provided example:
+
+```bash
+cp config.example.json config.json
+```
+
+Edit `config.json` as needed. The file path can be overridden with the `CONFIG_FILE` environment variable.
+
+```json
+{
+  "redis": {
+    "addr": "localhost:6379",
+    "channel": "slack-commands",
+    "viewSubmissionChannel": "slack-relay-view-submission",
+    "poppitList": "poppit:notifications",
+    "slackLinerList": "slack_messages"
+  },
+  "slack": {
+    "channelNewRepo": "#new-repo"
+  },
+  "github": {
+    "org": "my-org"
+  },
+  "paths": {
+    "workingDir": "/tmp",
+    "vibeopsWorkingDir": "",
+    "githubPrivateWorkingDir": ""
+  },
+  "logging": {
+    "level": "info"
+  },
+  "issueCreationDelay": 5
+}
+```
+
+### 3. Loading order
+
+1. Config file (`config.json` or `$CONFIG_FILE`) is read first and provides non-secret settings.
+2. `.env` file provides secrets (`REDIS_PASSWORD`, `SLACK_BOT_TOKEN`).
+3. Environment variables always override both the config file and `.env` values.
+
+### Environment Variable Overrides
+
+All settings can be overridden via environment variables:
+
+| Variable | Config field | Default |
+|---|---|---|
+| `CONFIG_FILE` | *(path to config file)* | `config.json` |
+| `REDIS_ADDR` | `redis.addr` | `localhost:6379` |
+| `REDIS_PASSWORD` | *(secret, from `.env`)* | *(empty)* |
+| `REDIS_CHANNEL` | `redis.channel` | `slack-commands` |
+| `REDIS_VIEW_SUBMISSION_CHANNEL` | `redis.viewSubmissionChannel` | `slack-relay-view-submission` |
+| `REDIS_POPPIT_LIST` | `redis.poppitList` | `poppit:notifications` |
+| `REDIS_SLACKLINER_LIST` | `redis.slackLinerList` | `slack_messages` |
+| `SLACK_BOT_TOKEN` | *(secret, from `.env`, required)* | *(none)* |
+| `SLACK_CHANNEL_NEW_REPO` | `slack.channelNewRepo` | `#new-repo` |
+| `GITHUB_ORG` | `github.org` | *(required)* |
+| `WORKING_DIR` | `paths.workingDir` | `/tmp` |
+| `VIBEOPS_WORKING_DIR` | `paths.vibeopsWorkingDir` | *(empty)* |
+| `GITHUB_PRIVATE_WORKING_DIR` | `paths.githubPrivateWorkingDir` | *(empty)* |
+| `LOG_LEVEL` | `logging.level` | `info` |
+| `ISSUE_CREATION_DELAY` | `issueCreationDelay` | `5` |
 
 ### Log Levels
 
@@ -87,8 +151,8 @@ make build
 
 3. Run the service:
 ```bash
-export SLACK_BOT_TOKEN=xoxb-your-token-here
-export GITHUB_ORG=your-github-org
+cp .env.example .env          # fill in your secrets
+cp config.example.json config.json  # edit non-secret settings
 ./slashviberepo
 ```
 

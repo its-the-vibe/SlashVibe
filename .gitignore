@@ -36,6 +36,9 @@ go.work.sum
 # Secret files
 .secret
 
+# Local config file (use config.example.json as a template)
+config.json
+
 # Editor/IDE
 # .idea/
 # .vscode/

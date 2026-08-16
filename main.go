@@ -160,38 +160,111 @@ type Config struct {
 	IssueCreationDelay         int
 }
 
+// fileConfig mirrors the JSON structure of config.json
+type fileConfig struct {
+	Redis struct {
+		Addr                  string `json:"addr"`
+		Channel               string `json:"channel"`
+		ViewSubmissionChannel string `json:"viewSubmissionChannel"`
+		PoppitList            string `json:"poppitList"`
+		SlackLinerList        string `json:"slackLinerList"`
+	} `json:"redis"`
+	Slack struct {
+		ChannelNewRepo string `json:"channelNewRepo"`
+	} `json:"slack"`
+	Github struct {
+		Org string `json:"org"`
+	} `json:"github"`
+	Paths struct {
+		WorkingDir              string `json:"workingDir"`
+		VibeOpsWorkingDir       string `json:"vibeopsWorkingDir"`
+		GithubPrivateWorkingDir string `json:"githubPrivateWorkingDir"`
+	} `json:"paths"`
+	Logging struct {
+		Level string `json:"level"`
+	} `json:"logging"`
+	IssueCreationDelay int `json:"issueCreationDelay"`
+}
+
+// loadFileConfig reads the JSON config file from the path given by the CONFIG_FILE
+// environment variable, defaulting to "config.json" in the current directory.
+// It returns a zero-value fileConfig (all empty strings / zero ints) when the
+// file does not exist so that callers can fall back to defaults without error.
+func loadFileConfig() (fileConfig, string, error) {
+	path := getEnv("CONFIG_FILE", "config.json")
+	var fc fileConfig
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return fc, path, nil
+		}
+		return fc, path, fmt.Errorf("failed to read config file %q: %w", path, err)
+	}
+	if err := json.Unmarshal(data, &fc); err != nil {
+		return fc, path, fmt.Errorf("failed to parse config file %q: %w", path, err)
+	}
+	return fc, path, nil
+}
+
 func loadConfig() (*Config, error) {
-	config := &Config{
-		RedisAddr:                  getEnv("REDIS_ADDR", "localhost:6379"),
-		RedisPassword:              getEnv("REDIS_PASSWORD", ""),
-		RedisChannel:               getEnv("REDIS_CHANNEL", "slack-commands"),
-		RedisViewSubmissionChannel: getEnv("REDIS_VIEW_SUBMISSION_CHANNEL", "slack-relay-view-submission"),
-		RedisPoppitList:            getEnv("REDIS_POPPIT_LIST", "poppit:notifications"),
-		RedisSlackLinerList:        getEnv("REDIS_SLACKLINER_LIST", "slack_messages"),
-		SlackToken:                 getEnv("SLACK_BOT_TOKEN", ""),
-		SlackChannelNewRepo:        getEnv("SLACK_CHANNEL_NEW_REPO", "#new-repo"),
-		GithubOrg:                  getEnv("GITHUB_ORG", ""),
-		WorkingDir:                 getEnv("WORKING_DIR", "/tmp"),
-		VibeOpsWorkingDir:          getEnv("VIBEOPS_WORKING_DIR", ""),
-		GithubPrivateWorkingDir:    getEnv("GITHUB_PRIVATE_WORKING_DIR", ""),
-		LogLevel:                   getEnv("LOG_LEVEL", "info"),
+	fc, configPath, err := loadFileConfig()
+	if err != nil {
+		return nil, err
+	}
+	if configPath != "" {
+		if _, statErr := os.Stat(configPath); statErr == nil {
+			log.Printf("[INFO] Loaded configuration from %s", configPath)
+		}
 	}
 
-	// Parse issue creation delay
-	delayStr := getEnv("ISSUE_CREATION_DELAY", "5")
-	delay, err := strconv.Atoi(delayStr)
-	if err != nil {
-		log.Printf("[WARN] Invalid ISSUE_CREATION_DELAY '%s', using default of 5 seconds", delayStr)
-		delay = 5
+	// Helper: prefer file value over default, but env var always wins.
+	fileOrDefault := func(fileVal, defaultVal string) string {
+		if fileVal != "" {
+			return fileVal
+		}
+		return defaultVal
 	}
-	config.IssueCreationDelay = delay
+
+	config := &Config{
+		RedisAddr:                  getEnv("REDIS_ADDR", fileOrDefault(fc.Redis.Addr, "localhost:6379")),
+		RedisPassword:              getEnv("REDIS_PASSWORD", ""),
+		RedisChannel:               getEnv("REDIS_CHANNEL", fileOrDefault(fc.Redis.Channel, "slack-commands")),
+		RedisViewSubmissionChannel: getEnv("REDIS_VIEW_SUBMISSION_CHANNEL", fileOrDefault(fc.Redis.ViewSubmissionChannel, "slack-relay-view-submission")),
+		RedisPoppitList:            getEnv("REDIS_POPPIT_LIST", fileOrDefault(fc.Redis.PoppitList, "poppit:notifications")),
+		RedisSlackLinerList:        getEnv("REDIS_SLACKLINER_LIST", fileOrDefault(fc.Redis.SlackLinerList, "slack_messages")),
+		SlackToken:                 getEnv("SLACK_BOT_TOKEN", ""),
+		SlackChannelNewRepo:        getEnv("SLACK_CHANNEL_NEW_REPO", fileOrDefault(fc.Slack.ChannelNewRepo, "#new-repo")),
+		GithubOrg:                  getEnv("GITHUB_ORG", fc.Github.Org),
+		WorkingDir:                 getEnv("WORKING_DIR", fileOrDefault(fc.Paths.WorkingDir, "/tmp")),
+		VibeOpsWorkingDir:          getEnv("VIBEOPS_WORKING_DIR", fc.Paths.VibeOpsWorkingDir),
+		GithubPrivateWorkingDir:    getEnv("GITHUB_PRIVATE_WORKING_DIR", fc.Paths.GithubPrivateWorkingDir),
+		LogLevel:                   getEnv("LOG_LEVEL", fileOrDefault(fc.Logging.Level, "info")),
+	}
+
+	// IssueCreationDelay: env var > config file > default (5)
+	delayDefault := 5
+	if fc.IssueCreationDelay != 0 {
+		delayDefault = fc.IssueCreationDelay
+	}
+	delayStr := os.Getenv("ISSUE_CREATION_DELAY")
+	if delayStr != "" {
+		delay, err := strconv.Atoi(delayStr)
+		if err != nil {
+			log.Printf("[WARN] Invalid ISSUE_CREATION_DELAY '%s', using default of %d seconds", delayStr, delayDefault)
+			config.IssueCreationDelay = delayDefault
+		} else {
+			config.IssueCreationDelay = delay
+		}
+	} else {
+		config.IssueCreationDelay = delayDefault
+	}
 
 	if config.SlackToken == "" {
-		return nil, fmt.Errorf("SLACK_BOT_TOKEN must be set via environment variable")
+		return nil, fmt.Errorf("SLACK_BOT_TOKEN must be set via environment variable or .env file")
 	}
 
 	if config.GithubOrg == "" {
-		return nil, fmt.Errorf("GITHUB_ORG must be set via environment variable")
+		return nil, fmt.Errorf("GITHUB_ORG must be set via config file, environment variable, or .env file")
 	}
 
 	return config, nil

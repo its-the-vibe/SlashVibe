@@ -1,0 +1,24 @@
+{
+  "redis": {
+    "addr": "localhost:6379",
+    "channel": "slack-commands",
+    "viewSubmissionChannel": "slack-relay-view-submission",
+    "poppitList": "poppit:notifications",
+    "slackLinerList": "slack_messages"
+  },
+  "slack": {
+    "channelNewRepo": "#new-repo"
+  },
+  "github": {
+    "org": "my-org"
+  },
+  "paths": {
+    "workingDir": "/tmp",
+    "vibeopsWorkingDir": "",
+    "githubPrivateWorkingDir": ""
+  },
+  "logging": {
+    "level": "info"
+  },
+  "issueCreationDelay": 5
+}

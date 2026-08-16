@@ -448,6 +448,154 @@ func TestLoadConfigWithoutGithubPrivateWorkingDir(t *testing.T) {
 	}
 }
 
+// TestLoadFileConfig tests the JSON config file parsing
+func TestLoadFileConfig(t *testing.T) {
+	t.Run("ValidConfigFile", func(t *testing.T) {
+		content := `{
+			"redis": {"addr": "redis:6380", "channel": "my-channel", "viewSubmissionChannel": "my-vsub", "poppitList": "my-poppit", "slackLinerList": "my-liner"},
+			"slack": {"channelNewRepo": "#my-new-repo"},
+			"github": {"org": "my-org"},
+			"paths": {"workingDir": "/work", "vibeopsWorkingDir": "/vibeops", "githubPrivateWorkingDir": "/private"},
+			"logging": {"level": "debug"},
+			"issueCreationDelay": 10
+		}`
+		f, err := os.CreateTemp("", "config-*.json")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer os.Remove(f.Name())
+		if _, err := f.WriteString(content); err != nil {
+			t.Fatal(err)
+		}
+		f.Close()
+
+		os.Setenv("CONFIG_FILE", f.Name())
+		defer os.Unsetenv("CONFIG_FILE")
+
+		fc, path, err := loadFileConfig()
+		if err != nil {
+			t.Fatalf("loadFileConfig() error: %v", err)
+		}
+		if path != f.Name() {
+			t.Errorf("path = %q, want %q", path, f.Name())
+		}
+		if fc.Redis.Addr != "redis:6380" {
+			t.Errorf("Redis.Addr = %q, want %q", fc.Redis.Addr, "redis:6380")
+		}
+		if fc.Github.Org != "my-org" {
+			t.Errorf("Github.Org = %q, want %q", fc.Github.Org, "my-org")
+		}
+		if fc.IssueCreationDelay != 10 {
+			t.Errorf("IssueCreationDelay = %d, want 10", fc.IssueCreationDelay)
+		}
+		if fc.Logging.Level != "debug" {
+			t.Errorf("Logging.Level = %q, want debug", fc.Logging.Level)
+		}
+	})
+
+	t.Run("MissingConfigFile", func(t *testing.T) {
+		os.Setenv("CONFIG_FILE", "/nonexistent/config.json")
+		defer os.Unsetenv("CONFIG_FILE")
+
+		fc, _, err := loadFileConfig()
+		if err != nil {
+			t.Fatalf("loadFileConfig() should not error for missing file, got: %v", err)
+		}
+		if fc.Redis.Addr != "" {
+			t.Errorf("expected zero-value fileConfig for missing file")
+		}
+	})
+
+	t.Run("InvalidJSON", func(t *testing.T) {
+		f, err := os.CreateTemp("", "config-*.json")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer os.Remove(f.Name())
+		f.WriteString("{not valid json}")
+		f.Close()
+
+		os.Setenv("CONFIG_FILE", f.Name())
+		defer os.Unsetenv("CONFIG_FILE")
+
+		_, _, err = loadFileConfig()
+		if err == nil {
+			t.Error("loadFileConfig() should return error for invalid JSON")
+		}
+	})
+}
+
+// TestLoadConfigFromFile tests that loadConfig reads values from config.json
+func TestLoadConfigFromFile(t *testing.T) {
+	content := `{
+		"redis": {"addr": "redis-from-file:6379"},
+		"github": {"org": "file-org"},
+		"slack": {"channelNewRepo": "#from-file"},
+		"logging": {"level": "warn"},
+		"issueCreationDelay": 7
+	}`
+	f, err := os.CreateTemp("", "config-*.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(f.Name())
+	f.WriteString(content)
+	f.Close()
+
+	os.Setenv("CONFIG_FILE", f.Name())
+	os.Setenv("SLACK_BOT_TOKEN", "test-token")
+	defer func() {
+		os.Unsetenv("CONFIG_FILE")
+		os.Unsetenv("SLACK_BOT_TOKEN")
+	}()
+
+	config, err := loadConfig()
+	if err != nil {
+		t.Fatalf("loadConfig() failed: %v", err)
+	}
+	if config.RedisAddr != "redis-from-file:6379" {
+		t.Errorf("RedisAddr = %q, want redis-from-file:6379", config.RedisAddr)
+	}
+	if config.GithubOrg != "file-org" {
+		t.Errorf("GithubOrg = %q, want file-org", config.GithubOrg)
+	}
+	if config.LogLevel != "warn" {
+		t.Errorf("LogLevel = %q, want warn", config.LogLevel)
+	}
+	if config.IssueCreationDelay != 7 {
+		t.Errorf("IssueCreationDelay = %d, want 7", config.IssueCreationDelay)
+	}
+}
+
+// TestLoadConfigEnvOverridesFile tests that env vars override config file values
+func TestLoadConfigEnvOverridesFile(t *testing.T) {
+	content := `{"redis": {"addr": "file-redis:6379"}, "github": {"org": "file-org"}}`
+	f, err := os.CreateTemp("", "config-*.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(f.Name())
+	f.WriteString(content)
+	f.Close()
+
+	os.Setenv("CONFIG_FILE", f.Name())
+	os.Setenv("SLACK_BOT_TOKEN", "test-token")
+	os.Setenv("REDIS_ADDR", "env-redis:6380")
+	defer func() {
+		os.Unsetenv("CONFIG_FILE")
+		os.Unsetenv("SLACK_BOT_TOKEN")
+		os.Unsetenv("REDIS_ADDR")
+	}()
+
+	config, err := loadConfig()
+	if err != nil {
+		t.Fatalf("loadConfig() failed: %v", err)
+	}
+	if config.RedisAddr != "env-redis:6380" {
+		t.Errorf("RedisAddr = %q, want env-redis:6380 (env should override file)", config.RedisAddr)
+	}
+}
+
 // TestLoadConfigWithIssueCreationDelay tests that the ISSUE_CREATION_DELAY is correctly loaded
 func TestLoadConfigWithIssueCreationDelay(t *testing.T) {
 	tests := []struct {
