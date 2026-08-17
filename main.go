@@ -109,19 +109,25 @@ type SlashCommandPayload struct {
 	APIAppID    string `json:"api_app_id"`
 }
 
+// ViewStateValue represents a single action element value in a modal view state
+type ViewStateValue struct {
+	Type           string `json:"type"`
+	Value          string `json:"value"`
+	SelectedOption *struct {
+		Value string `json:"value"`
+	} `json:"selected_option"`
+	SelectedOptions []struct {
+		Value string `json:"value"`
+	} `json:"selected_options"`
+}
+
 // ViewSubmissionPayload represents the incoming view submission from Redis
 type ViewSubmissionPayload struct {
 	Type string `json:"type"`
 	View struct {
 		CallbackID string `json:"callback_id"`
 		State      struct {
-			Values map[string]map[string]struct {
-				Type            string `json:"type"`
-				Value           string `json:"value"`
-				SelectedOptions []struct {
-					Value string `json:"value"`
-				} `json:"selected_options"`
-			} `json:"values"`
+			Values map[string]map[string]ViewStateValue `json:"values"`
 		} `json:"state"`
 	} `json:"view"`
 }
@@ -153,6 +159,7 @@ type Config struct {
 	SlackToken                 string
 	SlackChannelNewRepo        string
 	GithubOrg                  string
+	TemplateRepos              []string
 	WorkingDir                 string
 	VibeOpsWorkingDir          string
 	GithubPrivateWorkingDir    string
@@ -173,7 +180,8 @@ type fileConfig struct {
 		ChannelNewRepo string `json:"channelNewRepo"`
 	} `json:"slack"`
 	Github struct {
-		Org string `json:"org"`
+		Org           string   `json:"org"`
+		TemplateRepos []string `json:"templateRepos"`
 	} `json:"github"`
 	Paths struct {
 		WorkingDir              string `json:"workingDir"`
@@ -235,6 +243,7 @@ func loadConfig() (*Config, error) {
 		SlackToken:                 getEnv("SLACK_BOT_TOKEN", ""),
 		SlackChannelNewRepo:        getEnv("SLACK_CHANNEL_NEW_REPO", fileOrDefault(fc.Slack.ChannelNewRepo, "#new-repo")),
 		GithubOrg:                  getEnv("GITHUB_ORG", fc.Github.Org),
+		TemplateRepos:              fc.Github.TemplateRepos,
 		WorkingDir:                 getEnv("WORKING_DIR", fileOrDefault(fc.Paths.WorkingDir, "/tmp")),
 		VibeOpsWorkingDir:          getEnv("VIBEOPS_WORKING_DIR", fc.Paths.VibeOpsWorkingDir),
 		GithubPrivateWorkingDir:    getEnv("GITHUB_PRIVATE_WORKING_DIR", fc.Paths.GithubPrivateWorkingDir),
@@ -356,7 +365,7 @@ func main() {
 			if msg == nil {
 				continue
 			}
-			handleMessage(ctx, logger, slackClient, msg.Payload)
+			handleMessage(ctx, logger, slackClient, config, msg.Payload)
 		case msg := <-viewSubmissionCh:
 			if msg == nil {
 				continue
@@ -366,7 +375,7 @@ func main() {
 	}
 }
 
-func handleMessage(ctx context.Context, logger *Logger, slackClient *slack.Client, payload string) {
+func handleMessage(ctx context.Context, logger *Logger, slackClient *slack.Client, config *Config, payload string) {
 	logger.Debug("Received message: %s", payload)
 
 	var cmd SlashCommandPayload
@@ -379,16 +388,16 @@ func handleMessage(ctx context.Context, logger *Logger, slackClient *slack.Clien
 
 	switch cmd.Command {
 	case "/new-repo":
-		handleNewRepoCommand(ctx, logger, slackClient, &cmd)
+		handleNewRepoCommand(ctx, logger, slackClient, config, &cmd)
 	default:
 		logger.Debug("Unknown command: %s", cmd.Command)
 	}
 }
 
-func handleNewRepoCommand(ctx context.Context, logger *Logger, slackClient *slack.Client, cmd *SlashCommandPayload) {
+func handleNewRepoCommand(ctx context.Context, logger *Logger, slackClient *slack.Client, config *Config, cmd *SlashCommandPayload) {
 	logger.Debug("Handling /new-repo command with trigger_id: %s", cmd.TriggerID)
 
-	modalView := createNewRepoModal(cmd.Text)
+	modalView := createNewRepoModal(cmd.Text, config.TemplateRepos)
 
 	_, err := slackClient.OpenViewContext(ctx, cmd.TriggerID, modalView)
 	if err != nil {
@@ -399,7 +408,7 @@ func handleNewRepoCommand(ctx context.Context, logger *Logger, slackClient *slac
 	logger.Info("Successfully opened new-repo modal for user: %s", cmd.UserName)
 }
 
-func createNewRepoModal(repoName string) slack.ModalViewRequest {
+func createNewRepoModal(repoName string, templateRepos []string) slack.ModalViewRequest {
 	// Create the repository name input block
 	repoNameInput := slack.NewPlainTextInputBlockElement(
 		slack.NewTextBlockObject(slack.PlainTextType, "my-awesome-repo", false, false),
@@ -463,6 +472,51 @@ func createNewRepoModal(repoName string) slack.ModalViewRequest {
 	)
 	vibeOpsCheckboxBlock.Optional = true
 
+	// Build block set
+	blockSet := []slack.Block{
+		repoNameBlock,
+		repoDescBlock,
+		aiPromptBlock,
+		vibeOpsCheckboxBlock,
+	}
+
+	// Add template repo selector if templates are configured
+	if len(templateRepos) > 0 {
+		// Build option list with "No Template" as first option
+		templateOptions := []*slack.OptionBlockObject{
+			slack.NewOptionBlockObject(
+				"none",
+				slack.NewTextBlockObject(slack.PlainTextType, "No Template", false, false),
+				nil,
+			),
+		}
+		for _, tmpl := range templateRepos {
+			templateOptions = append(templateOptions, slack.NewOptionBlockObject(
+				tmpl,
+				slack.NewTextBlockObject(slack.PlainTextType, tmpl, false, false),
+				nil,
+			))
+		}
+
+		templateSelect := slack.NewOptionsSelectBlockElement(
+			slack.OptTypeStatic,
+			slack.NewTextBlockObject(slack.PlainTextType, "Select a template repository", false, false),
+			"template_repo_select",
+			templateOptions...,
+		)
+		templateSelect.InitialOption = templateOptions[0]
+
+		templateBlock := slack.NewInputBlock(
+			"template-repo",
+			slack.NewTextBlockObject(slack.PlainTextType, "Template Repository", false, false),
+			slack.NewTextBlockObject(slack.PlainTextType, "Optionally start from a template repository", false, false),
+			templateSelect,
+		)
+		templateBlock.Optional = true
+
+		blockSet = append(blockSet, templateBlock)
+	}
+
 	// Create the modal view
 	modalView := slack.ModalViewRequest{
 		Type:       slack.VTModal,
@@ -480,12 +534,7 @@ func createNewRepoModal(repoName string) slack.ModalViewRequest {
 			Text: "Submit",
 		},
 		Blocks: slack.Blocks{
-			BlockSet: []slack.Block{
-				repoNameBlock,
-				repoDescBlock,
-				aiPromptBlock,
-				vibeOpsCheckboxBlock,
-			},
+			BlockSet: blockSet,
 		},
 	}
 
@@ -531,7 +580,17 @@ func handleViewSubmission(ctx context.Context, logger *Logger, redisClient *redi
 	repoFullName := fmt.Sprintf("%s/%s", config.GithubOrg, repoName)
 
 	// Build the gh repo create command
-	ghRepoCreateCmd := fmt.Sprintf("gh repo create %s --public --add-readme --gitignore Go", repoFullName)
+	templateRepo := values["template-repo"]
+	if templateRepo == "none" {
+		templateRepo = ""
+	}
+
+	var ghRepoCreateCmd string
+	if templateRepo != "" {
+		ghRepoCreateCmd = fmt.Sprintf("gh repo create %s --public --template %s", repoFullName, templateRepo)
+	} else {
+		ghRepoCreateCmd = fmt.Sprintf("gh repo create %s --public --add-readme --gitignore Go", repoFullName)
+	}
 	if repoDesc != "" {
 		// Use single quotes for better safety, but escape any single quotes in the description
 		escapedDesc := strings.ReplaceAll(repoDesc, `'`, `'\''`)
@@ -764,6 +823,11 @@ func extractViewValues(submission ViewSubmissionPayload) map[string]string {
 					result[blockID] = "true"
 				} else {
 					result[blockID] = "false"
+				}
+			} else if valueObj.Type == "static_select" {
+				// Handle static select dropdowns
+				if valueObj.SelectedOption != nil {
+					result[blockID] = valueObj.SelectedOption.Value
 				}
 			} else {
 				// Handle text inputs and other types

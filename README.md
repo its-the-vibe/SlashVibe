@@ -60,7 +60,8 @@ Edit `config.json` as needed. The file path can be overridden with the `CONFIG_F
     "channelNewRepo": "#new-repo"
   },
   "github": {
-    "org": "my-org"
+    "org": "my-org",
+    "templateRepos": []
   },
   "paths": {
     "workingDir": "/tmp",
@@ -96,11 +97,28 @@ All settings can be overridden via environment variables:
 | `SLACK_BOT_TOKEN` | *(secret, from `.env`, required)* | *(none)* |
 | `SLACK_CHANNEL_NEW_REPO` | `slack.channelNewRepo` | `#new-repo` |
 | `GITHUB_ORG` | `github.org` | *(required)* |
+| *(config file only)* | `github.templateRepos` | `[]` |
 | `WORKING_DIR` | `paths.workingDir` | `/tmp` |
 | `VIBEOPS_WORKING_DIR` | `paths.vibeopsWorkingDir` | *(empty)* |
 | `GITHUB_PRIVATE_WORKING_DIR` | `paths.githubPrivateWorkingDir` | *(empty)* |
 | `LOG_LEVEL` | `logging.level` | `info` |
 | `ISSUE_CREATION_DELAY` | `issueCreationDelay` | `5` |
+
+### Template Repositories
+
+The `github.templateRepos` config file field accepts an optional list of GitHub repository names (in `owner/repo` format) that users can select as a starting template when creating a new repository via the `/new-repo` slash command.
+
+```json
+"github": {
+  "org": "my-org",
+  "templateRepos": [
+    "my-org/template-go-service",
+    "my-org/template-python-app"
+  ]
+}
+```
+
+When templates are configured, the *New Repo* modal displays a **Template Repository** dropdown containing a *No Template* option (the default) plus each configured template. If the user selects a template, the repository is created with `gh repo create --template <template>` instead of the default `--add-readme --gitignore Go` flags. If no templates are configured the dropdown is not shown.
 
 ### Log Levels
 
