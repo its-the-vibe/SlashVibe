@@ -143,8 +143,12 @@ func makeViewPayload(values map[string]map[string]ViewStateValue) ViewSubmission
 
 // TestExtractViewValues tests the extraction of values from view submissions
 func TestExtractViewValues(t *testing.T) {
-	selectedOption := func(val string) *struct{ Value string `json:"value"` } {
-		v := struct{ Value string `json:"value"` }{Value: val}
+	selectedOption := func(val string) *struct {
+		Value string `json:"value"`
+	} {
+		v := struct {
+			Value string `json:"value"`
+		}{Value: val}
 		return &v
 	}
 
@@ -350,15 +354,31 @@ func TestLoadConfigWithTemplateRepos(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(f.Name())
-	f.WriteString(content)
-	f.Close()
-
-	os.Setenv("CONFIG_FILE", f.Name())
-	os.Setenv("SLACK_BOT_TOKEN", "test-token")
 	defer func() {
-		os.Unsetenv("CONFIG_FILE")
-		os.Unsetenv("SLACK_BOT_TOKEN")
+		if err := os.Remove(f.Name()); err != nil && !os.IsNotExist(err) {
+			t.Errorf("os.Remove() error = %v", err)
+		}
+	}()
+	if _, err := f.WriteString(content); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := os.Setenv("CONFIG_FILE", f.Name()); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Setenv("SLACK_BOT_TOKEN", "test-token"); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := os.Unsetenv("CONFIG_FILE"); err != nil {
+			t.Errorf("os.Unsetenv(CONFIG_FILE) error = %v", err)
+		}
+		if err := os.Unsetenv("SLACK_BOT_TOKEN"); err != nil {
+			t.Errorf("os.Unsetenv(SLACK_BOT_TOKEN) error = %v", err)
+		}
 	}()
 
 	config, err := loadConfig()
@@ -379,11 +399,19 @@ func TestLoadConfigWithTemplateRepos(t *testing.T) {
 
 // TestLoadConfigWithNoTemplateRepos tests that templateRepos defaults to nil when not configured
 func TestLoadConfigWithNoTemplateRepos(t *testing.T) {
-	os.Setenv("SLACK_BOT_TOKEN", "test-token")
-	os.Setenv("GITHUB_ORG", "test-org")
+	if err := os.Setenv("SLACK_BOT_TOKEN", "test-token"); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Setenv("GITHUB_ORG", "test-org"); err != nil {
+		t.Fatal(err)
+	}
 	defer func() {
-		os.Unsetenv("SLACK_BOT_TOKEN")
-		os.Unsetenv("GITHUB_ORG")
+		if err := os.Unsetenv("SLACK_BOT_TOKEN"); err != nil {
+			t.Errorf("os.Unsetenv(SLACK_BOT_TOKEN) error = %v", err)
+		}
+		if err := os.Unsetenv("GITHUB_ORG"); err != nil {
+			t.Errorf("os.Unsetenv(GITHUB_ORG) error = %v", err)
+		}
 	}()
 
 	config, err := loadConfig()
@@ -399,13 +427,25 @@ func TestLoadConfigWithNoTemplateRepos(t *testing.T) {
 // TestLoadConfigWithGithubPrivateWorkingDir tests that the GITHUB_PRIVATE_WORKING_DIR is correctly loaded
 func TestLoadConfigWithGithubPrivateWorkingDir(t *testing.T) {
 	// Set up test environment
-	os.Setenv("SLACK_BOT_TOKEN", "test-token")
-	os.Setenv("GITHUB_ORG", "test-org")
-	os.Setenv("GITHUB_PRIVATE_WORKING_DIR", "/test/github-private")
+	if err := os.Setenv("SLACK_BOT_TOKEN", "test-token"); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Setenv("GITHUB_ORG", "test-org"); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Setenv("GITHUB_PRIVATE_WORKING_DIR", "/test/github-private"); err != nil {
+		t.Fatal(err)
+	}
 	defer func() {
-		os.Unsetenv("SLACK_BOT_TOKEN")
-		os.Unsetenv("GITHUB_ORG")
-		os.Unsetenv("GITHUB_PRIVATE_WORKING_DIR")
+		if err := os.Unsetenv("SLACK_BOT_TOKEN"); err != nil {
+			t.Errorf("os.Unsetenv(SLACK_BOT_TOKEN) error = %v", err)
+		}
+		if err := os.Unsetenv("GITHUB_ORG"); err != nil {
+			t.Errorf("os.Unsetenv(GITHUB_ORG) error = %v", err)
+		}
+		if err := os.Unsetenv("GITHUB_PRIVATE_WORKING_DIR"); err != nil {
+			t.Errorf("os.Unsetenv(GITHUB_PRIVATE_WORKING_DIR) error = %v", err)
+		}
 	}()
 
 	config, err := loadConfig()
@@ -421,11 +461,19 @@ func TestLoadConfigWithGithubPrivateWorkingDir(t *testing.T) {
 // TestLoadConfigWithoutGithubPrivateWorkingDir tests that the config loads with empty GITHUB_PRIVATE_WORKING_DIR
 func TestLoadConfigWithoutGithubPrivateWorkingDir(t *testing.T) {
 	// Set up test environment
-	os.Setenv("SLACK_BOT_TOKEN", "test-token")
-	os.Setenv("GITHUB_ORG", "test-org")
+	if err := os.Setenv("SLACK_BOT_TOKEN", "test-token"); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Setenv("GITHUB_ORG", "test-org"); err != nil {
+		t.Fatal(err)
+	}
 	defer func() {
-		os.Unsetenv("SLACK_BOT_TOKEN")
-		os.Unsetenv("GITHUB_ORG")
+		if err := os.Unsetenv("SLACK_BOT_TOKEN"); err != nil {
+			t.Errorf("os.Unsetenv(SLACK_BOT_TOKEN) error = %v", err)
+		}
+		if err := os.Unsetenv("GITHUB_ORG"); err != nil {
+			t.Errorf("os.Unsetenv(GITHUB_ORG) error = %v", err)
+		}
 	}()
 
 	config, err := loadConfig()
@@ -453,14 +501,26 @@ func TestLoadFileConfig(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer os.Remove(f.Name())
+		defer func() {
+			if err := os.Remove(f.Name()); err != nil && !os.IsNotExist(err) {
+				t.Errorf("os.Remove() error = %v", err)
+			}
+		}()
 		if _, err := f.WriteString(content); err != nil {
 			t.Fatal(err)
 		}
-		f.Close()
+		if err := f.Close(); err != nil {
+			t.Fatal(err)
+		}
 
-		os.Setenv("CONFIG_FILE", f.Name())
-		defer os.Unsetenv("CONFIG_FILE")
+		if err := os.Setenv("CONFIG_FILE", f.Name()); err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if err := os.Unsetenv("CONFIG_FILE"); err != nil {
+				t.Errorf("os.Unsetenv(CONFIG_FILE) error = %v", err)
+			}
+		}()
 
 		fc, path, err := loadFileConfig()
 		if err != nil {
@@ -484,8 +544,14 @@ func TestLoadFileConfig(t *testing.T) {
 	})
 
 	t.Run("MissingConfigFile", func(t *testing.T) {
-		os.Setenv("CONFIG_FILE", "/nonexistent/config.json")
-		defer os.Unsetenv("CONFIG_FILE")
+		if err := os.Setenv("CONFIG_FILE", "/nonexistent/config.json"); err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if err := os.Unsetenv("CONFIG_FILE"); err != nil {
+				t.Errorf("os.Unsetenv(CONFIG_FILE) error = %v", err)
+			}
+		}()
 
 		fc, _, err := loadFileConfig()
 		if err != nil {
@@ -501,12 +567,26 @@ func TestLoadFileConfig(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer os.Remove(f.Name())
-		f.WriteString("{not valid json}")
-		f.Close()
+		defer func() {
+			if err := os.Remove(f.Name()); err != nil && !os.IsNotExist(err) {
+				t.Errorf("os.Remove() error = %v", err)
+			}
+		}()
+		if _, err := f.WriteString("{not valid json}"); err != nil {
+			t.Fatal(err)
+		}
+		if err := f.Close(); err != nil {
+			t.Fatal(err)
+		}
 
-		os.Setenv("CONFIG_FILE", f.Name())
-		defer os.Unsetenv("CONFIG_FILE")
+		if err := os.Setenv("CONFIG_FILE", f.Name()); err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if err := os.Unsetenv("CONFIG_FILE"); err != nil {
+				t.Errorf("os.Unsetenv(CONFIG_FILE) error = %v", err)
+			}
+		}()
 
 		_, _, err = loadFileConfig()
 		if err == nil {
@@ -528,15 +608,31 @@ func TestLoadConfigFromFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(f.Name())
-	f.WriteString(content)
-	f.Close()
-
-	os.Setenv("CONFIG_FILE", f.Name())
-	os.Setenv("SLACK_BOT_TOKEN", "test-token")
 	defer func() {
-		os.Unsetenv("CONFIG_FILE")
-		os.Unsetenv("SLACK_BOT_TOKEN")
+		if err := os.Remove(f.Name()); err != nil && !os.IsNotExist(err) {
+			t.Errorf("os.Remove() error = %v", err)
+		}
+	}()
+	if _, err := f.WriteString(content); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := os.Setenv("CONFIG_FILE", f.Name()); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Setenv("SLACK_BOT_TOKEN", "test-token"); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := os.Unsetenv("CONFIG_FILE"); err != nil {
+			t.Errorf("os.Unsetenv(CONFIG_FILE) error = %v", err)
+		}
+		if err := os.Unsetenv("SLACK_BOT_TOKEN"); err != nil {
+			t.Errorf("os.Unsetenv(SLACK_BOT_TOKEN) error = %v", err)
+		}
 	}()
 
 	config, err := loadConfig()
@@ -564,17 +660,37 @@ func TestLoadConfigEnvOverridesFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(f.Name())
-	f.WriteString(content)
-	f.Close()
-
-	os.Setenv("CONFIG_FILE", f.Name())
-	os.Setenv("SLACK_BOT_TOKEN", "test-token")
-	os.Setenv("REDIS_ADDR", "env-redis:6380")
 	defer func() {
-		os.Unsetenv("CONFIG_FILE")
-		os.Unsetenv("SLACK_BOT_TOKEN")
-		os.Unsetenv("REDIS_ADDR")
+		if err := os.Remove(f.Name()); err != nil && !os.IsNotExist(err) {
+			t.Errorf("os.Remove() error = %v", err)
+		}
+	}()
+	if _, err := f.WriteString(content); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := os.Setenv("CONFIG_FILE", f.Name()); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Setenv("SLACK_BOT_TOKEN", "test-token"); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Setenv("REDIS_ADDR", "env-redis:6380"); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := os.Unsetenv("CONFIG_FILE"); err != nil {
+			t.Errorf("os.Unsetenv(CONFIG_FILE) error = %v", err)
+		}
+		if err := os.Unsetenv("SLACK_BOT_TOKEN"); err != nil {
+			t.Errorf("os.Unsetenv(SLACK_BOT_TOKEN) error = %v", err)
+		}
+		if err := os.Unsetenv("REDIS_ADDR"); err != nil {
+			t.Errorf("os.Unsetenv(REDIS_ADDR) error = %v", err)
+		}
 	}()
 
 	config, err := loadConfig()
@@ -603,17 +719,31 @@ func TestLoadConfigWithIssueCreationDelay(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Set up test environment
-			os.Setenv("SLACK_BOT_TOKEN", "test-token")
-			os.Setenv("GITHUB_ORG", "test-org")
+			if err := os.Setenv("SLACK_BOT_TOKEN", "test-token"); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Setenv("GITHUB_ORG", "test-org"); err != nil {
+				t.Fatal(err)
+			}
 			if tt.envValue != "" {
-				os.Setenv("ISSUE_CREATION_DELAY", tt.envValue)
+				if err := os.Setenv("ISSUE_CREATION_DELAY", tt.envValue); err != nil {
+					t.Fatal(err)
+				}
 			} else {
-				os.Unsetenv("ISSUE_CREATION_DELAY")
+				if err := os.Unsetenv("ISSUE_CREATION_DELAY"); err != nil {
+					t.Fatal(err)
+				}
 			}
 			defer func() {
-				os.Unsetenv("SLACK_BOT_TOKEN")
-				os.Unsetenv("GITHUB_ORG")
-				os.Unsetenv("ISSUE_CREATION_DELAY")
+				if err := os.Unsetenv("SLACK_BOT_TOKEN"); err != nil {
+					t.Errorf("os.Unsetenv(SLACK_BOT_TOKEN) error = %v", err)
+				}
+				if err := os.Unsetenv("GITHUB_ORG"); err != nil {
+					t.Errorf("os.Unsetenv(GITHUB_ORG) error = %v", err)
+				}
+				if err := os.Unsetenv("ISSUE_CREATION_DELAY"); err != nil {
+					t.Errorf("os.Unsetenv(ISSUE_CREATION_DELAY) error = %v", err)
+				}
 			}()
 
 			config, err := loadConfig()
