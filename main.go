@@ -308,7 +308,11 @@ func main() {
 		Addr:     config.RedisAddr,
 		Password: config.RedisPassword, // empty means no password
 	})
-	defer redisClient.Close()
+	defer func() {
+		if err := redisClient.Close(); err != nil {
+			logger.Error("Failed to close Redis client: %v", err)
+		}
+	}()
 
 	// Test Redis connection
 	ctx := context.Background()
@@ -334,11 +338,19 @@ func main() {
 	// Subscribe to Redis channels
 	logger.Info("Subscribing to Redis channel: %s", config.RedisChannel)
 	pubsub := redisClient.Subscribe(ctx, config.RedisChannel)
-	defer pubsub.Close()
+	defer func() {
+		if err := pubsub.Close(); err != nil {
+			logger.Error("Failed to close Redis channel subscription: %v", err)
+		}
+	}()
 
 	logger.Info("Subscribing to Redis view submission channel: %s", config.RedisViewSubmissionChannel)
 	viewSubmissionPubsub := redisClient.Subscribe(ctx, config.RedisViewSubmissionChannel)
-	defer viewSubmissionPubsub.Close()
+	defer func() {
+		if err := viewSubmissionPubsub.Close(); err != nil {
+			logger.Error("Failed to close Redis view submission subscription: %v", err)
+		}
+	}()
 
 	// Wait for subscription confirmation
 	_, err = pubsub.Receive(ctx)
@@ -818,18 +830,19 @@ func extractViewValues(submission ViewSubmissionPayload) map[string]string {
 		// We extract the first (and only) value from each block
 		for _, valueObj := range blockValues {
 			// Handle checkboxes (checkboxes type)
-			if valueObj.Type == "checkboxes" {
+			switch valueObj.Type {
+			case "checkboxes":
 				if len(valueObj.SelectedOptions) > 0 {
 					result[blockID] = "true"
 				} else {
 					result[blockID] = "false"
 				}
-			} else if valueObj.Type == "static_select" {
+			case "static_select":
 				// Handle static select dropdowns
 				if valueObj.SelectedOption != nil {
 					result[blockID] = valueObj.SelectedOption.Value
 				}
-			} else {
+			default:
 				// Handle text inputs and other types
 				result[blockID] = valueObj.Value
 			}
@@ -847,7 +860,7 @@ func isValidRepoName(name string) bool {
 		return false
 	}
 	for _, c := range name {
-		if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' || c == '_' || c == '.') {
+		if (c < 'a' || c > 'z') && (c < 'A' || c > 'Z') && (c < '0' || c > '9') && c != '-' && c != '_' && c != '.' {
 			return false
 		}
 	}

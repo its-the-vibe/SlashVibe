@@ -10,7 +10,7 @@ test:
 	$(GO) test -v -race -coverprofile=coverage.out ./...
 
 lint:
-	$(GO) vet ./...
+	golangci-lint run
 
 clean:
 	rm -f $(BINARY_NAME) coverage.out
