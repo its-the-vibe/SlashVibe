@@ -6,6 +6,8 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/slack-go/slack"
 )
 
 // TestLoggerLevels tests that log levels are properly filtered
@@ -131,8 +133,21 @@ func TestIsValidRepoName(t *testing.T) {
 	}
 }
 
+// makeViewPayload is a test helper that builds a ViewSubmissionPayload from a flat
+// map of blockID -> ViewStateValue entries.
+func makeViewPayload(values map[string]map[string]ViewStateValue) ViewSubmissionPayload {
+	var p ViewSubmissionPayload
+	p.View.State.Values = values
+	return p
+}
+
 // TestExtractViewValues tests the extraction of values from view submissions
 func TestExtractViewValues(t *testing.T) {
+	selectedOption := func(val string) *struct{ Value string `json:"value"` } {
+		v := struct{ Value string `json:"value"` }{Value: val}
+		return &v
+	}
+
 	tests := []struct {
 		name     string
 		payload  ViewSubmissionPayload
@@ -140,196 +155,51 @@ func TestExtractViewValues(t *testing.T) {
 	}{
 		{
 			name: "TextInputOnly",
-			payload: ViewSubmissionPayload{
-				View: struct {
-					CallbackID string `json:"callback_id"`
-					State      struct {
-						Values map[string]map[string]struct {
-							Type            string `json:"type"`
-							Value           string `json:"value"`
-							SelectedOptions []struct {
-								Value string `json:"value"`
-							} `json:"selected_options"`
-						} `json:"values"`
-					} `json:"state"`
-				}{
-					State: struct {
-						Values map[string]map[string]struct {
-							Type            string `json:"type"`
-							Value           string `json:"value"`
-							SelectedOptions []struct {
-								Value string `json:"value"`
-							} `json:"selected_options"`
-						} `json:"values"`
-					}{
-						Values: map[string]map[string]struct {
-							Type            string `json:"type"`
-							Value           string `json:"value"`
-							SelectedOptions []struct {
-								Value string `json:"value"`
-							} `json:"selected_options"`
-						}{
-							"repo-name": {
-								"repo_name_input": {
-									Type:  "plain_text_input",
-									Value: "test-repo",
-								},
-							},
-						},
-					},
+			payload: makeViewPayload(map[string]map[string]ViewStateValue{
+				"repo-name": {
+					"repo_name_input": {Type: "plain_text_input", Value: "test-repo"},
 				},
-			},
-			expected: map[string]string{
-				"repo-name": "test-repo",
-			},
+			}),
+			expected: map[string]string{"repo-name": "test-repo"},
 		},
 		{
 			name: "CheckboxSelected",
-			payload: ViewSubmissionPayload{
-				View: struct {
-					CallbackID string `json:"callback_id"`
-					State      struct {
-						Values map[string]map[string]struct {
-							Type            string `json:"type"`
-							Value           string `json:"value"`
-							SelectedOptions []struct {
-								Value string `json:"value"`
-							} `json:"selected_options"`
-						} `json:"values"`
-					} `json:"state"`
-				}{
-					State: struct {
-						Values map[string]map[string]struct {
-							Type            string `json:"type"`
-							Value           string `json:"value"`
-							SelectedOptions []struct {
-								Value string `json:"value"`
-							} `json:"selected_options"`
-						} `json:"values"`
-					}{
-						Values: map[string]map[string]struct {
-							Type            string `json:"type"`
-							Value           string `json:"value"`
-							SelectedOptions []struct {
-								Value string `json:"value"`
-							} `json:"selected_options"`
-						}{
-							"vibeops-config": {
-								"vibeops_config_checkbox": {
-									Type: "checkboxes",
-									SelectedOptions: []struct {
-										Value string `json:"value"`
-									}{
-										{Value: "create_vibeops_config"},
-									},
-								},
-							},
-						},
+			payload: makeViewPayload(map[string]map[string]ViewStateValue{
+				"vibeops-config": {
+					"vibeops_config_checkbox": {
+						Type: "checkboxes",
+						SelectedOptions: []struct {
+							Value string `json:"value"`
+						}{{Value: "create_vibeops_config"}},
 					},
 				},
-			},
-			expected: map[string]string{
-				"vibeops-config": "true",
-			},
+			}),
+			expected: map[string]string{"vibeops-config": "true"},
 		},
 		{
 			name: "CheckboxNotSelected",
-			payload: ViewSubmissionPayload{
-				View: struct {
-					CallbackID string `json:"callback_id"`
-					State      struct {
-						Values map[string]map[string]struct {
-							Type            string `json:"type"`
-							Value           string `json:"value"`
-							SelectedOptions []struct {
-								Value string `json:"value"`
-							} `json:"selected_options"`
-						} `json:"values"`
-					} `json:"state"`
-				}{
-					State: struct {
-						Values map[string]map[string]struct {
-							Type            string `json:"type"`
-							Value           string `json:"value"`
-							SelectedOptions []struct {
-								Value string `json:"value"`
-							} `json:"selected_options"`
-						} `json:"values"`
-					}{
-						Values: map[string]map[string]struct {
-							Type            string `json:"type"`
-							Value           string `json:"value"`
-							SelectedOptions []struct {
-								Value string `json:"value"`
-							} `json:"selected_options"`
-						}{
-							"vibeops-config": {
-								"vibeops_config_checkbox": {
-									Type: "checkboxes",
-									SelectedOptions: []struct {
-										Value string `json:"value"`
-									}{},
-								},
-							},
-						},
-					},
+			payload: makeViewPayload(map[string]map[string]ViewStateValue{
+				"vibeops-config": {
+					"vibeops_config_checkbox": {Type: "checkboxes"},
 				},
-			},
-			expected: map[string]string{
-				"vibeops-config": "false",
-			},
+			}),
+			expected: map[string]string{"vibeops-config": "false"},
 		},
 		{
 			name: "MixedTextAndCheckbox",
-			payload: ViewSubmissionPayload{
-				View: struct {
-					CallbackID string `json:"callback_id"`
-					State      struct {
-						Values map[string]map[string]struct {
-							Type            string `json:"type"`
-							Value           string `json:"value"`
-							SelectedOptions []struct {
-								Value string `json:"value"`
-							} `json:"selected_options"`
-						} `json:"values"`
-					} `json:"state"`
-				}{
-					State: struct {
-						Values map[string]map[string]struct {
-							Type            string `json:"type"`
-							Value           string `json:"value"`
-							SelectedOptions []struct {
-								Value string `json:"value"`
-							} `json:"selected_options"`
-						} `json:"values"`
-					}{
-						Values: map[string]map[string]struct {
-							Type            string `json:"type"`
-							Value           string `json:"value"`
-							SelectedOptions []struct {
-								Value string `json:"value"`
-							} `json:"selected_options"`
-						}{
-							"repo-name": {
-								"repo_name_input": {
-									Type:  "plain_text_input",
-									Value: "my-repo",
-								},
-							},
-							"vibeops-config": {
-								"vibeops_config_checkbox": {
-									Type: "checkboxes",
-									SelectedOptions: []struct {
-										Value string `json:"value"`
-									}{
-										{Value: "create_vibeops_config"},
-									},
-								},
-							},
-						},
+			payload: makeViewPayload(map[string]map[string]ViewStateValue{
+				"repo-name": {
+					"repo_name_input": {Type: "plain_text_input", Value: "my-repo"},
+				},
+				"vibeops-config": {
+					"vibeops_config_checkbox": {
+						Type: "checkboxes",
+						SelectedOptions: []struct {
+							Value string `json:"value"`
+						}{{Value: "create_vibeops_config"}},
 					},
 				},
-			},
+			}),
 			expected: map[string]string{
 				"repo-name":      "my-repo",
 				"vibeops-config": "true",
@@ -337,55 +207,63 @@ func TestExtractViewValues(t *testing.T) {
 		},
 		{
 			name: "WithAIPrompt",
-			payload: ViewSubmissionPayload{
-				View: struct {
-					CallbackID string `json:"callback_id"`
-					State      struct {
-						Values map[string]map[string]struct {
-							Type            string `json:"type"`
-							Value           string `json:"value"`
-							SelectedOptions []struct {
-								Value string `json:"value"`
-							} `json:"selected_options"`
-						} `json:"values"`
-					} `json:"state"`
-				}{
-					State: struct {
-						Values map[string]map[string]struct {
-							Type            string `json:"type"`
-							Value           string `json:"value"`
-							SelectedOptions []struct {
-								Value string `json:"value"`
-							} `json:"selected_options"`
-						} `json:"values"`
-					}{
-						Values: map[string]map[string]struct {
-							Type            string `json:"type"`
-							Value           string `json:"value"`
-							SelectedOptions []struct {
-								Value string `json:"value"`
-							} `json:"selected_options"`
-						}{
-							"repo-name": {
-								"repo_name_input": {
-									Type:  "plain_text_input",
-									Value: "my-repo",
-								},
-							},
-							"ai-prompt": {
-								"ai_prompt_input": {
-									Type:  "plain_text_input",
-									Value: "Test AI Prompt",
-								},
-							},
-						},
-					},
+			payload: makeViewPayload(map[string]map[string]ViewStateValue{
+				"repo-name": {
+					"repo_name_input": {Type: "plain_text_input", Value: "my-repo"},
 				},
-			},
+				"ai-prompt": {
+					"ai_prompt_input": {Type: "plain_text_input", Value: "Test AI Prompt"},
+				},
+			}),
 			expected: map[string]string{
 				"repo-name": "my-repo",
 				"ai-prompt": "Test AI Prompt",
 			},
+		},
+		{
+			name: "StaticSelectWithTemplate",
+			payload: makeViewPayload(map[string]map[string]ViewStateValue{
+				"repo-name": {
+					"repo_name_input": {Type: "plain_text_input", Value: "my-repo"},
+				},
+				"template-repo": {
+					"template_repo_select": {
+						Type:           "static_select",
+						SelectedOption: selectedOption("my-org/template-go"),
+					},
+				},
+			}),
+			expected: map[string]string{
+				"repo-name":     "my-repo",
+				"template-repo": "my-org/template-go",
+			},
+		},
+		{
+			name: "StaticSelectNoTemplate",
+			payload: makeViewPayload(map[string]map[string]ViewStateValue{
+				"repo-name": {
+					"repo_name_input": {Type: "plain_text_input", Value: "my-repo"},
+				},
+				"template-repo": {
+					"template_repo_select": {
+						Type:           "static_select",
+						SelectedOption: selectedOption("none"),
+					},
+				},
+			}),
+			expected: map[string]string{
+				"repo-name":     "my-repo",
+				"template-repo": "none",
+			},
+		},
+		{
+			name: "StaticSelectNilOption",
+			payload: makeViewPayload(map[string]map[string]ViewStateValue{
+				"template-repo": {
+					"template_repo_select": {Type: "static_select"},
+				},
+			}),
+			expected: map[string]string{},
 		},
 	}
 
@@ -403,6 +281,118 @@ func TestExtractViewValues(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TestCreateNewRepoModalWithTemplates tests that the modal includes a template selector when templates are configured
+func TestCreateNewRepoModalWithTemplates(t *testing.T) {
+	t.Run("NoTemplates", func(t *testing.T) {
+		modal := createNewRepoModal("", nil)
+		for _, block := range modal.Blocks.BlockSet {
+			if ib, ok := block.(*slack.InputBlock); ok {
+				if ib.BlockID == "template-repo" {
+					t.Error("modal should not include template-repo block when no templates configured")
+				}
+			}
+		}
+	})
+
+	t.Run("EmptyTemplateList", func(t *testing.T) {
+		modal := createNewRepoModal("", []string{})
+		for _, block := range modal.Blocks.BlockSet {
+			if ib, ok := block.(*slack.InputBlock); ok {
+				if ib.BlockID == "template-repo" {
+					t.Error("modal should not include template-repo block when template list is empty")
+				}
+			}
+		}
+	})
+
+	t.Run("WithTemplates", func(t *testing.T) {
+		templates := []string{"my-org/template-go", "my-org/template-python"}
+		modal := createNewRepoModal("", templates)
+		found := false
+		for _, block := range modal.Blocks.BlockSet {
+			if ib, ok := block.(*slack.InputBlock); ok && ib.BlockID == "template-repo" {
+				found = true
+				if !ib.Optional {
+					t.Error("template-repo block should be optional")
+				}
+			}
+		}
+		if !found {
+			t.Error("modal should include template-repo block when templates are configured")
+		}
+	})
+
+	t.Run("WithRepoNamePrePopulated", func(t *testing.T) {
+		modal := createNewRepoModal("my-repo", []string{"my-org/template-go"})
+		found := false
+		for _, block := range modal.Blocks.BlockSet {
+			if ib, ok := block.(*slack.InputBlock); ok && ib.BlockID == "repo-name" {
+				found = true
+				_ = ib
+			}
+		}
+		if !found {
+			t.Error("modal should include repo-name block")
+		}
+	})
+}
+
+// TestLoadConfigWithTemplateRepos tests that templateRepos are loaded from the config file
+func TestLoadConfigWithTemplateRepos(t *testing.T) {
+	content := `{
+		"github": {"org": "test-org", "templateRepos": ["my-org/template-go", "my-org/template-python"]},
+		"logging": {"level": "info"}
+	}`
+	f, err := os.CreateTemp("", "config-*.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(f.Name())
+	f.WriteString(content)
+	f.Close()
+
+	os.Setenv("CONFIG_FILE", f.Name())
+	os.Setenv("SLACK_BOT_TOKEN", "test-token")
+	defer func() {
+		os.Unsetenv("CONFIG_FILE")
+		os.Unsetenv("SLACK_BOT_TOKEN")
+	}()
+
+	config, err := loadConfig()
+	if err != nil {
+		t.Fatalf("loadConfig() failed: %v", err)
+	}
+
+	if len(config.TemplateRepos) != 2 {
+		t.Fatalf("expected 2 template repos, got %d", len(config.TemplateRepos))
+	}
+	if config.TemplateRepos[0] != "my-org/template-go" {
+		t.Errorf("TemplateRepos[0] = %q, want my-org/template-go", config.TemplateRepos[0])
+	}
+	if config.TemplateRepos[1] != "my-org/template-python" {
+		t.Errorf("TemplateRepos[1] = %q, want my-org/template-python", config.TemplateRepos[1])
+	}
+}
+
+// TestLoadConfigWithNoTemplateRepos tests that templateRepos defaults to nil when not configured
+func TestLoadConfigWithNoTemplateRepos(t *testing.T) {
+	os.Setenv("SLACK_BOT_TOKEN", "test-token")
+	os.Setenv("GITHUB_ORG", "test-org")
+	defer func() {
+		os.Unsetenv("SLACK_BOT_TOKEN")
+		os.Unsetenv("GITHUB_ORG")
+	}()
+
+	config, err := loadConfig()
+	if err != nil {
+		t.Fatalf("loadConfig() failed: %v", err)
+	}
+
+	if len(config.TemplateRepos) != 0 {
+		t.Errorf("expected empty TemplateRepos, got %v", config.TemplateRepos)
 	}
 }
 

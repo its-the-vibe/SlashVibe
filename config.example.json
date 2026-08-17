@@ -10,7 +10,8 @@
     "channelNewRepo": "#new-repo"
   },
   "github": {
-    "org": "my-org"
+    "org": "my-org",
+    "templateRepos": []
   },
   "paths": {
     "workingDir": "/tmp",
